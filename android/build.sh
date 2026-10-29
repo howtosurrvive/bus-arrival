@@ -109,7 +109,7 @@ mkdir -p ../dist
 cp "$OUT/bus-1.0.0.apk" "../dist/bus-arrival-1.0.0.apk"
 "$JAVA" -jar "$BT/lib/apksigner.jar" verify --print-certs "../dist/bus-arrival-1.0.0.apk" > "$OUT/certs.txt"
 python - "$OUT" <<'PY'
-import hashlib, json, os, sys, datetime
+import hashlib, json, os, re, sys, datetime
 out = sys.argv[1]
 apk = os.path.join(os.path.dirname(out), "..", "dist", "bus-arrival-1.0.0.apk")
 apk = os.path.abspath(apk)
@@ -130,6 +130,18 @@ info = {
 p = os.path.join(os.path.dirname(apk), "apk-info.json")
 open(p, "w", encoding="utf-8").write(json.dumps(info, ensure_ascii=False, indent=2))
 print("==> dist/apk-info.json 已更新")
+
+# 顺手把下载页上的校验值和证书指纹同步过来 —— 每次重新签名，APK 的哈希都会变，
+# 页面上的数不跟着改，就会出现「页面写的和实际文件对不上」，那是不能留的。
+idx = os.path.abspath(os.path.join(os.path.dirname(apk), "..", "index.html"))
+try:
+    html = open(idx, encoding="utf-8").read()
+    html = re.sub(r"(对不上就别装<br><code>)[0-9a-f]{64}", r"\g<1>" + info["sha256"], html)
+    html = re.sub(r"(证书指纹<br><code>)[0-9a-f]{64}", r"\g<1>" + cert, html)
+    open(idx, "w", encoding="utf-8").write(html)
+    print("==> index.html 上的 SHA-256 / 证书指纹已同步")
+except Exception as e:
+    print("!! 同步 index.html 失败：", e)
 PY
 
 ls -lh "$OUT/bus-1.0.0.apk" ../dist/
