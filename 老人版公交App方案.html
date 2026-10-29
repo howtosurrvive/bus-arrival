@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>老人版公交查询 App · 可行方案</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: system-ui, -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif;
+  background: #FAFAF8; color: #2C2C2A; line-height: 1.75;
+  font-size: 16px; padding: 56px 24px 80px;
+}
+.wrap { max-width: 880px; margin: 0 auto; }
+h1 { font-size: 30px; font-weight: 500; letter-spacing: -0.3px; margin-bottom: 8px; }
+.sub { color: #5F5E5A; font-size: 15px; margin-bottom: 40px; }
+h2 {
+  font-size: 20px; font-weight: 500; margin: 52px 0 18px;
+  padding-bottom: 10px; border-bottom: 1px solid #E5E3DC;
+}
+h2 .num { color: #185FA5; margin-right: 10px; font-variant-numeric: tabular-nums; }
+h3 { font-size: 16px; font-weight: 500; margin: 28px 0 10px; color: #0C447C; }
+p { margin-bottom: 14px; }
+ul, ol { margin: 0 0 16px 22px; }
+li { margin-bottom: 9px; }
+strong { font-weight: 500; color: #1a1a18; }
+code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  background: #F1EFE8; padding: 2px 6px; border-radius: 4px; font-size: 14px;
+}
+pre {
+  background: #F1EFE8; border: 1px solid #E5E3DC; border-radius: 10px;
+  padding: 18px 20px; overflow-x: auto; margin: 14px 0 20px;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 13.5px; line-height: 1.65;
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+
+.callout {
+  border-left: 3px solid #185FA5; background: #E6F1FB;
+  padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 20px 0;
+}
+.callout.warn { border-left-color: #BA7517; background: #FAEEDA; }
+.callout.danger { border-left-color: #A32D2D; background: #FCEBEB; }
+.callout p:last-child { margin-bottom: 0; }
+.callout strong { color: #0C447C; }
+.callout.warn strong { color: #854F0B; }
+.callout.danger strong { color: #791F1F; }
+
+table {
+  width: 100%; border-collapse: collapse; margin: 18px 0 24px;
+  font-size: 14.5px;
+}
+th {
+  text-align: left; font-weight: 500; padding: 11px 14px;
+  background: #F1EFE8; border-bottom: 1px solid #D3D1C7;
+  color: #444441;
+}
+td { padding: 12px 14px; border-bottom: 1px solid #EAE8E1; vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+td code { font-size: 13px; }
+
+.tag {
+  display: inline-block; font-size: 12px; padding: 2px 9px;
+  border-radius: 20px; margin-right: 6px; white-space: nowrap;
+  font-weight: 500; line-height: 1.7;
+}
+.tag.best { background: #E1F5EE; color: #0F6E56; }
+.tag.ref  { background: #E6F1FB; color: #185FA5; }
+.tag.no   { background: #FCEBEB; color: #A32D2D; }
+.tag.mid  { background: #FAEEDA; color: #854F0B; }
+
+.card {
+  border: 1px solid #E5E3DC; border-radius: 12px;
+  padding: 20px 22px; margin: 16px 0; background: #fff;
+}
+.card h3 { margin-top: 0; }
+.card .meta { font-size: 13px; color: #888780; margin-bottom: 10px; }
+.card p:last-child { margin-bottom: 0; }
+
+.step {
+  display: flex; gap: 16px; padding: 16px 0;
+  border-bottom: 1px solid #EAE8E1;
+}
+.step:last-child { border-bottom: none; }
+.step .v {
+  flex-shrink: 0; width: 62px; font-weight: 500; color: #185FA5;
+  font-family: ui-monospace, monospace; font-size: 14px; padding-top: 2px;
+}
+.step .body { flex: 1; }
+.step .body b { font-weight: 500; display: block; margin-bottom: 3px; }
+.step .body span { color: #5F5E5A; font-size: 14.5px; }
+
+.foot {
+  margin-top: 64px; padding-top: 24px; border-top: 1px solid #E5E3DC;
+  font-size: 13.5px; color: #888780;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>老人版公交查询 App · 可行方案</h1>
+<p class="sub">需求起点：掌上公交弹窗广告过多 · 目标：无广告、易操作、功能不砍 · 2026-10-29</p>
+
+<div class="callout danger">
+<p><strong>先说边界。</strong>拆包、反编译、去掉广告后重新签名分发别人的 APK，属于侵犯著作权。掌上公交是工信部备案的商业应用，实时数据来自厦门搜谷的商业接口，改包这条路法律上站不住，也不值得走。</p>
+<p>能走的路是<strong>自己做一个</strong>：功能对齐、广告为零、专为老人设计。下面的方案全部基于这条路。</p>
+</div>
+
+<div class="callout">
+<p><strong>而且你的诉求有明文依据。</strong>工信部《移动互联网应用（APP）适老化通用设计规范》第 5.1.1 条：<strong>适老版界面、单独的适老版 APP 中严禁出现广告内容及插件，也不能随机出现广告或临时性的广告弹窗。</strong></p>
+<p>另有第 2.4 条：弹窗关闭按钮最小点击区域不得小于 44×44dp，且只可在左上、右上、中央底部。<strong>摇一摇跳转、关闭键只有 12dp</strong> 这两件事，按现行规范都是违规的。这条信息本身有用 —— 除了自己做，你也可以通过 12321 或工信部投诉渠道要求厂商整改。</p>
+</div>
+
+<h2><span class="num">01</span>GitHub 上可以直接参考的项目</h2>
+
+<p>找了四个，按与本次需求的贴合度排序。第一个几乎是白送的。</p>
+
+<div class="card">
+<h3>xiaofeiTM233 / my-bus-app <span class="tag best">最贴合 · 直接 fork</span></h3>
+<div class="meta">Flutter · Dart · 六端（Android / iOS / Windows / macOS / Linux / Web）</div>
+<p>这是一个基于 Flutter 复刻掌上公交公开查询体验的开源客户端。查线路、看站牌、盯车辆、找附近站点、地图查车，功能与原版对齐。数据直连 <code>h5.mygolbs.com</code> 的公开查询接口，覆盖 565 个城市，不需要登录，不需要注册地图 key。</p>
+<p><strong>技术栈</strong>：provider + ChangeNotifier 管状态、dio 管网络、flutter_map + 高德栅格瓦片做地图（GCJ-02，零 key）、geolocator 定位并本地做 WGS84→GCJ-02 转换、shared_preferences 做持久化、Material 3。</p>
+<p><strong>它的接口层已经摸清了</strong>，这省掉最费时间的一步：</p>
+<ul style="margin-bottom:12px">
+<li><code>CMD103</code> 线路拓扑（站点序列），按城市+线路+方向做内存缓存</li>
+<li><code>CMD106</code> 附近站点</li>
+<li><code>CMD110</code> 站点搜索　·　<code>CMD114</code> 线路搜索</li>
+<li><code>CMD209</code> 同名/反向站台换向</li>
+</ul>
+<p><strong>对我们意味着什么</strong>：不用从零逆向接口，不用自己实现站序推算。拿它的 <code>MyBusClient</code> 和到站信息解析器当底座，把 UI 层整个换掉就是老人版。<strong>它的架构可以直接抄，它的界面一个都不要留。</strong></p>
+<p><span class="tag mid">注意</span>接口是厂商的，<strong>自用没问题，上架分发不行</strong>。这一点后面第 6 节展开。</p>
+</div>
+
+<div class="card">
+<h3>OneBusAway / onebusaway-android <span class="tag ref">架构参考</span></h3>
+<div class="meta">Java 98% · 2753 commits · GPL · Google Play 有正式发布版</div>
+<p>北美开源公交项目的官方安卓客户端，从 2010 年维护到现在。它做的事情是：客户端很薄，所有公交数据由服务端的 OBA API 提供，服务端再对接各城市的 GTFS / GTFS-Realtime 数据源。</p>
+<p><strong>值得学的只有一件事：分层的位置。</strong>它把"数据从哪来"彻底推到了服务端，客户端只认一套 OBA REST 协议。所以它一个 App 能服务几十个城市，换城市只是换服务器地址。</p>
+<p><strong>局限</strong>：国内没有 OBA 服务器，它的数据接不上，UI 也不适合老人。看它的 <code>SYSTEM_ARCHITECTURE.md</code> 就够了，别碰代码。</p>
+</div>
+
+<div class="card">
+<h3>TriLinder / FindMyBus <span class="tag ref">轻量实现参考</span></h3>
+<div class="meta">Svelte + Capacitor + KonstaUI · GPL-3.0 · F-Droid 发布</div>
+<p>只做一件事：把 GTFS-Realtime 数据里的车标在地图上，附带时刻表。整个 App 前端只有一个主界面，代码量很小，阅读完大概两小时。</p>
+<p><strong>价值在于"一个页面能做到多干净"</strong>。老人版的核心就是"一个页面讲清一件事"，这个项目的取舍逻辑值得看。它也是 Web 技术套壳安卓的思路，如果你考虑用网页版绕过安装问题，这是参考。</p>
+</div>
+
+<div class="card">
+<h3>ITblz / amap_bus_plugin · bingocode / flutter_bingocode <span class="tag no">仅存参考</span></h3>
+<div class="meta">均为 2020 年前后项目，已停更</div>
+<p>前者是高德地图 SDK 公交查询的 Flutter 封装（只实现了安卓），后者是北京的实时公交查询实战项目。现在直接依赖有风险，但看它们怎么调高德的公交接口、怎么组织站点数据结构，仍然省事。</p>
+</div>
+
+<h2><span class="num">02</span>架构：三层，关键是数据层可换</h2>
+
+<p>整套设计里只有一个决定是真正重要的 —— <strong>把"数据从哪来"和"界面怎么画"彻底切开</strong>。</p>
+
+<p>原因是现实：公交实时数据的供应方随时会变。厂商封接口、政府平台上线、高德调整配额，任何一件发生，写死在 UI 里的代码就要重写一遍。做成适配器，换源只改一个文件。</p>
+
+<pre><code>abstract class TransitSource {
+  Future&lt;List&lt;Stop&gt;&gt;      nearbyStops(LatLng pos, int radius);
+  Future&lt;List&lt;BusLine&gt;&gt;   searchLine(String city, String keyword);
+  Future&lt;List&lt;Arrival&gt;&gt;   arrivals(String stopId, String lineId);
+  Future&lt;TripPlan&gt;        plan(LatLng from, LatLng to);
+}</code></pre>
+
+<p>四个实现，按优先级：</p>
+
+<table>
+<tr><th style="width:22%">实现</th><th style="width:30%">数据来源</th><th>取舍</th></tr>
+<tr>
+<td><code>MyGolbsSource</code></td>
+<td>h5.mygolbs.com 公开查询接口</td>
+<td>565 城，最全，到站精度最好。<strong>仅限家庭自用，不对外分发。</strong></td>
+</tr>
+<tr>
+<td><code>AmapSource</code></td>
+<td>高德开放平台 Web 服务 API</td>
+<td>完全合规，有免费日配额（具体额度以控制台为准）。线路、站点、换乘数据可靠，<strong>但实时到站能力弱</strong>，部分城市没有。</td>
+</tr>
+<tr>
+<td><code>GovOpenSource</code></td>
+<td>各地公共数据开放平台</td>
+<td>免费、合法、可长期用。烟台等城市已开放公交到站预报，走 <code>X-Client-Id / X-Timestamp / X-Nonce / X-Signature</code> 的 HMAC-SHA256 签名。<strong>缺点是城市覆盖零散</strong>，得逐个城市确认。</td>
+</tr>
+<tr>
+<td><code>CacheSource</code></td>
+<td>本地 SQLite</td>
+<td>装饰器模式，包在任意数据源外面。缓存线路拓扑和站点表，<strong>断网时至少能看站序和首末班</strong>。</td>
+</tr>
+</table>
+
+<div class="callout warn">
+<p><strong>建议的组合</strong>：主源 <code>MyGolbsSource</code>（自用，拿精度），<code>CacheSource</code> 包在外面做兜底，<code>AmapSource</code> 只用来补线路静态信息和换乘。政府源等确认了城市再决定接不接。</p>
+</div>
+
+<h3>能力层</h3>
+<p>四个纯查询，不持有状态，输入参数出结果。这样每个都能单独写单元测试，也不用为了改一个 bug 去理解整个 App。附近站点做距离排序并合并同名站台，到站预测把"剩余站数"换算成分钟（用该线路历史平均站间耗时，取不到就用 2 分钟/站兜底）。</p>
+
+<h3>表现层：两个模式，一套代码</h3>
+<p>长辈模式是默认，标准模式留给家里年轻人帮设置时用（加收藏、改城市）。<strong>不做两个 App</strong>，切换开关放在长辈模式首屏右上角的小齿轮里，长按 3 秒才出现 —— 避免老人误触。</p>
+
+<h2><span class="num">03</span>适老化硬指标（直接当验收清单）</h2>
+
+<p>不用凭感觉调字号。工信部规范给了可量化的数字，我们按更严的一档取：</p>
+
+<table>
+<tr><th style="width:30%">项目</th><th style="width:34%">规范要求</th><th>我们的取值</th></tr>
+<tr><td>主界面文字</td><td>≥30dp；适老版主要文字 ≥18dp</td><td><strong>正文 28sp，到站时间 44sp</strong></td></tr>
+<tr><td>行间距</td><td>行距 ≥1.3 倍，段距 &gt; 行距 ×1.3</td><td>行高 1.6，段间距 24dp</td></tr>
+<tr><td>对比度</td><td>≥4.5:1（&gt;18dp 时 ≥3:1）</td><td><strong>7:1</strong>（深蓝底配白字）</td></tr>
+<tr><td>首页可点击区</td><td>≥48×48dp；适老版主要组件 ≥60×60dp</td><td><strong>按钮高 96dp，全宽</strong></td></tr>
+<tr><td>弹窗关闭键</td><td>≥44×44dp，仅左上/右上/中央底部</td><td><strong>零弹窗</strong></td></tr>
+<tr><td>手势</td><td>禁止 3 指以上复杂手势</td><td>全部单击，无滑动、无长按（设置除外）</td></tr>
+<tr><td>颜色用途</td><td>颜色不得作为唯一区分手段</td><td>到站状态同时用文字标注（"快到了"/"还有 3 站"）</td></tr>
+<tr><td>广告</td><td><strong>适老版严禁广告及插件</strong></td><td>零广告，零第三方 SDK</td></tr>
+<tr><td>辅助技术</td><td>不得禁止读屏软件接入</td><td>所有控件加 <code>Semantics</code> 标签，兼容 TalkBack</td></tr>
+<tr><td>个人信息</td><td>最小必要原则</td><td><strong>不做账号、不收集手机号</strong>；位置权限仅在"附近"功能时申请，拒绝也能用收藏线路</td></tr>
+</table>
+
+<div class="callout">
+<p><strong>一个容易被忽略的点：语音。</strong>老人眼花，与其把字放大到撑破布局，不如让 App 念出来。点开首屏自动播报"12 路还有 3 分钟"，用系统 TTS，不联网、不要 key。这条不在规范里，但实际收益比字号大。</p>
+</div>
+
+<h2><span class="num">04</span>自我迭代方案</h2>
+
+<p>先说迭代的驱动力。这是整个方案里最容易做错的地方。</p>
+
+<p><strong>老人不会给你需求。</strong>他不会说"我希望字体再大 2sp"，也不会说"换乘入口太深"。他只会说"不好用"，然后把 App 删掉，回到原来的方式。所以迭代不能靠问，只能靠看 —— 看他手指停在哪、点空了哪里、什么时候开始皱眉。</p>
+
+<h3>卡点日志：唯一的一手数据</h3>
+<p>每次有人在真机上试，只记三件事，不多记：</p>
+<ul>
+<li><strong>停在第几屏</strong>（打开 10 秒后还停在哪儿）</li>
+<li><strong>手指点了哪里</strong>（点空了、点错了、还是犹豫了 3 秒才点）</li>
+<li><strong>有没有出声</strong>（"这什么呀""怎么又跳了"这类自言自语，原话记下来）</li>
+</ul>
+<p>这三条比任何问卷都准。一条"他在首屏看了 8 秒才敢点"比十句"我觉得还行"有用。</p>
+
+<h3>五轮迭代</h3>
+
+<div style="margin:18px 0 24px">
+<div class="step">
+<div class="v">V0.1</div>
+<div class="body"><b>打通数据（1–2 天）</b><span>目标：证明数据拿得到。验收标准是命令行能打印出温州 12 路的实时到站，不要求界面。主要风险在接口参数和城市编码。</span></div>
+</div>
+<div class="step">
+<div class="v">V0.2</div>
+<div class="body"><b>单线跑通（3 天）</b><span>目标：一个页面、一条线路、能自动刷新。验收标准是装上手机显示分钟数，连续 5 分钟不崩。<strong>这一步故意用最丑的界面</strong>，不做任何视觉设计，避免把时间花在会推翻的东西上。</span></div>
+</div>
+<div class="step">
+<div class="v">V0.3</div>
+<div class="body"><b>长辈首屏（3 天）</b><span>目标：到站卡 + 三格 + 语音播报。验收标准很具体 —— 家里老人第一次打开，<strong>30 秒内能说出"12 路还有几分钟"</strong>。说不出来就是失败，不管界面多好看。</span></div>
+</div>
+<div class="step">
+<div class="v">V0.4</div>
+<div class="body"><b>卡点收敛（2 周，反复）</b><span>只改卡点，不加功能。每一轮改完让同一个人再试一次，看那个卡点有没有消失。</span></div>
+</div>
+<div class="step">
+<div class="v">V1.0</div>
+<div class="body"><b>装机（2 天）</b><span>图标、名称、离线兜底、崩溃日志。图标要能一眼认出 —— 大号公交图形加"公交"两个字，别用抽象线条。</span></div>
+</div>
+</div>
+
+<h3>三条纪律</h3>
+<ol>
+<li><strong>一次只改一个变量。</strong>同时改字号和布局，出了问题不知道是谁的错，等于白改一轮。</li>
+<li><strong>卡点没消失就不加新功能。</strong>V0.3 到 V0.4 之间最容易犯的错是"顺手把换乘也加上"——加完界面变复杂，卡点反而更多。</li>
+<li><strong>每个版本留一个能回退的 APK。</strong>老人用惯的版本被改坏，他不会反馈，他会直接不用。</li>
+</ol>
+
+<h3>我在这套循环里干什么</h3>
+<p>你不需要看代码，也不需要描述技术问题。你只需要描述现象：</p>
+<ul>
+<li>"我妈打开之后愣了一会儿才点" → 我判断是首屏信息层级问题</li>
+<li>"她点了个地方没反应" → 大概率是点击区不够大，我查那个控件尺寸</li>
+<li>"她说字还是小" → 我不猜，直接把她手机截图的字号量出来对比</li>
+</ul>
+<p>每一轮我给出一个能直接装的新 APK，你装上给她试，回来告诉我现象。<strong>这个循环能跑多快，取决于你反馈得多具体，不取决于我写代码多快。</strong></p>
+
+<h2><span class="num">05</span>必须先知道的硬约束</h2>
+
+<div class="callout danger">
+<p><strong>最要紧的一条：iPhone 装不了。</strong>苹果不允许侧载。要装只有三条路 —— 99 美元/年的开发者账号配 TestFlight（证书 90 天过期一次，到期要重新发）、企业签名（不稳定，随时掉签）、或者越狱。<strong>所以第一个要确认的问题是：老人用的是什么手机。</strong></p>
+<p>如果是 iPhone，方案要改成「网页版」—— 用 Safari 打开一个网址，加到主屏幕，图标和体验接近 App，没有安装门槛，也没有证书问题。这条路完全可行，只是地图和语音能力弱一点。</p>
+</div>
+
+<table>
+<tr><th style="width:30%">约束</th><th>实际情况与应对</th></tr>
+<tr><td><strong>不能上应用商店</strong></td><td>用厂商接口做的东西过不了审。定位就是家庭内部使用，直接发 APK。<strong>不要想着上架或分发</strong>，那会把自用变成商用侵权。</td></tr>
+<tr><td><strong>接口随时可能断</strong></td><td>这就是数据层要做适配器的原因。断了之后切高德或政府源，界面一行不改。平时让 <code>CacheSource</code> 保底，至少站序和首末班还在。</td></tr>
+<tr><td><strong>地图瓦片</strong></td><td>高德栅格瓦片可以零 key 直连，但属于非授权使用，请求量大可能被限流。老人版其实<strong>不需要大地图</strong>——他要的是"还有几分钟"，不是"车在哪"。地图可以只放在二级页，省掉这个风险。</td></tr>
+<tr><td><strong>首次配置</strong></td><td>老人不会自己加收藏。所以<strong>第一次必须由家里人配好</strong>：选城市、搜 2–3 条常用线路、存成"回家/菜场/医院"。配好之后他打开就能用。这个环节不能省。</td></tr>
+</table>
+
+<h2><span class="num">06</span>V0.1 已完成：温州数据确实通了</h2>
+
+<p>2026-10-29 实测，不是推测。接口 <code>h5.mygolbs.com/ApiData.do</code>，POST 表单，必须带 <code>Origin: https://h5.mygolbs.com</code>（没这个头会被风控返回加密乱码）。</p>
+
+<p><strong>城市名必须写「温州市」，写「温州」直接返回 <code>-2 当前城市暂无法提供公交查询</code>。</strong>这个坑记下来，第一次就踩了。</p>
+
+<p>36 路实测数据：</p>
+
+<table>
+<tr><th style="width:26%">项目</th><th>实测值</th></tr>
+<tr><td>线路</td><td>36 路　·　九山首末站 ↔ 浙南科技城首末站</td></tr>
+<tr><td>运营时间</td><td>05:50 – 19:00</td></tr>
+<tr><td>承运单位</td><td>温州交运集团城东公交有限公司　服务电话 0577-96035</td></tr>
+<tr><td>站点数</td><td>上行 40 站　·　下行 45 站</td></tr>
+<tr><td>实时数据</td><td><code>hasReal: 1</code>，正常返回在途车辆</td></tr>
+<tr><td>当场抓到的车</td><td>车牌 <code>1005277</code> 在市政大桥附近，距站 335.9 米；车牌 <code>1005267</code> 在四明山路附近，距站 141.6 米。带 GPS 经纬度和航向角。</td></tr>
+</table>
+
+<div class="callout danger">
+<p><strong>先说对不上的地方：36 路不经过东方学院。</strong></p>
+<p>上行 40 站、下行 45 站，全部站名里没有「东方」两个字。36 路走的是鹿城到龙湾这条线——九山 → 西站 → 市体育中心 → 新城站 → 雁湖社区 → 状元 → S1 科技城 → 浙南科技城。</p>
+<p>而「东方学院」站实际只有三条线：<strong>139 路</strong>（往金海园区）、<strong>159 路</strong>（往浙江东方学院首末站 / 状元公交枢纽）、<strong>温州湾新区通勤 3 线</strong>。这三条当场都有活数据，比如 159 路上行最近一辆还有 5 站 / 11 分钟。</p>
+<p><strong>所以要么线路号记错了，要么站名记错了。</strong>我不猜——猜错了后面全白做。</p>
+</div>
+
+<p>36 路上行经过的站，扫一眼有没有眼熟的：</p>
+
+<p style="font-size:14.5px;line-height:2;color:#444441;background:#F1EFE8;padding:16px 20px;border-radius:8px">
+九山首末站 · 粗糠桥 · 奥林匹克广场 · 西站(美美时尚广场) · 清明桥 · 杏花路 · 水心小学二校区 · 市政大桥 · 银都花苑 · 白鹿洲公园 · 茶院寺 · 市体育中心南 · 时代广场 · 横渎 · 市中西医结合医院 · 伯爵山庄 · 新城站 · 温州广播电视中心 · 计量大楼 · 雁湖社区 · 鸿基花苑 · 雁荡中路文昌路 · 诚鸿花苑 · 慎江路 · 龙湾时尚邻里 · 雁荡东路钱江路 · 四明山路 · 温州东瓯中学 · 石坦 · 岩岙 · 兴元路 · 状元二期工业区 · 周宅 · 温州大道龙腾南路 · 温州大道富强路 · S1科技城 · 附二医龙湾院区北 · 得利桥 · 附二医龙湾院区南 · 浙南科技城首末站
+</p>
+
+<h2><span class="num">07</span>选型：做 App，不做小程序</h2>
+
+<p>结论直接给：<strong>安卓 APK，Flutter 一套代码，顺带出 Web 版。</strong>小程序留作第二期备选，现在不做。</p>
+
+<p>不是因为小程序不好，是因为这个场景的胜负手就是<strong>步数</strong>——整份方案的第一原则。</p>
+
+<table>
+<tr><th style="width:22%">环节</th><th style="width:39%">小程序</th><th>App</th></tr>
+<tr><td>打开路径</td><td>解锁 → 微信 →（一堆红点）→ 下拉或发现 → 找小程序 → 看<br><strong>5 步</strong></td><td>解锁 → 点图标 → 看<br><strong>2 步</strong></td></tr>
+<tr><td>冷启动</td><td>要加载微信运行时，2–5 秒，老人以为卡死了</td><td>常驻内存，秒开</td></tr>
+<tr><td>到站提醒</td><td><strong>做不到。</strong>订阅消息一次性，老人不会反复点"允许"</td><td>可以。后台轮询 + 本地通知</td></tr>
+<tr><td>语音</td><td>"按住说话"习惯现成，但只能录完上传</td><td>可常驻监听，可离线识别</td></tr>
+<tr><td>干扰</td><td>微信消息红点会分心</td><td>没有</td></tr>
+<tr><td>安装门槛</td><td><strong>零门槛</strong>，家里人发个链接就行</td><td>要装 APK，得家里人帮忙</td></tr>
+<tr><td>更新</td><td><strong>自动</strong></td><td>要远程指导，或者你上门</td></tr>
+</table>
+
+<p>小程序只在两件事上真赢：安装门槛和自动更新。但这两件事<strong>由家里人一次性解决</strong>——你第一次装好、配好三条线路，之后就固定了。而"步数"和"到站提醒"是每天都发生的，逃不掉。</p>
+
+<div class="callout warn">
+<p><strong>别一次做两个。</strong>老人版最大的风险不是技术，是他不接受。先做一个跑通，让他真用上一周，再谈第二个入口。</p>
+<p>而且 Flutter 一套代码能同时出 APK 和 H5——H5 加到桌面就是个"准 App"，可以当安装失败时的兜底，成本几乎为零。小程序要另写一套 WXML/WXSS，等于两份代码两份维护，现在不值得。</p>
+</div>
+
+<h2><span class="num">08</span>语音和「导航」：需求要改</h2>
+
+<p>语音要做。<strong>但通用语音助手在老人场景是灾难，必须砍成有限指令集。</strong></p>
+
+<p>想象一下老人说："帮我看看那个去菜场的车还有多久。"ASR 转成文字没问题，接下来要做语义理解，理解错就要追问"您要查哪条线路？"——<strong>问一句就死。</strong>老人连错两次，这个功能他就再也不碰了。</p>
+
+<p>正确做法是<strong>只做槽位匹配，不做语义理解</strong>：</p>
+
+<table>
+<tr><th style="width:26%">语音输入</th><th>识别方式</th><th style="width:28%">匹配不到时</th></tr>
+<tr><td>"36 路""三十六路""三六"</td><td>正则提取数字 → 查线路表</td><td rowspan="2">说"没听清，您再讲一遍"，同时把三个大按钮高亮，让他点</td></tr>
+<tr><td>"回家""去菜场""去医院""去儿子家"</td><td>预设目的地词表精确匹配</td></tr>
+</table>
+
+<p>词汇表总共十来个词，成功率能上 90%。老人说错一次不会伤到他，因为界面本来就有兜底的大按钮。</p>
+
+<p><strong>ASR 选型</strong>：先用安卓系统自带 <code>SpeechRecognizer</code>（免费、不要 key、国产 ROM 都有），跑不赢再换讯飞 SDK。讯飞在中文口音和吴语方向上明显更强，离线版也免费，代价是包体变大、有装机量限制。<strong>先用免费的验证，别一上来就集成 SDK。</strong></p>
+
+<div class="callout">
+<p><strong>「自动搜索导航」这个需求，我建议改掉。</strong>老人说的"导航"和你理解的导航不是一回事——他要的不是地图上画一条蓝线，他要的是"我现在出门，赶不赶得上"。</p>
+</div>
+
+<p>真正该做的是三件事，都比导航有用，也都比导航简单：</p>
+
+<table>
+<tr><th style="width:24%">功能</th><th style="width:40%">老人实际场景</th><th>技术代价</th></tr>
+<tr><td><strong>到站提醒</strong><br><span class="tag best">最该做</span></td><td>在家烧水、在店里收账，不用一直盯手机。车还有 2 站时手机响一声，这时候出门刚好。</td><td>后台轮询 + 本地通知，<strong>两小时能做完</strong></td></tr>
+<tr><td><strong>下车提醒</strong></td><td>坐车时怕坐过站，尤其不常去的地方。快到站了震一下。</td><td>同一套轮询，改个判断条件</td></tr>
+<tr><td><strong>步行到站</strong></td><td>"距站台 320 米，步行约 4 分钟"——一句话，不画路线图。</td><td>有坐标就能算，半小时</td></tr>
+</table>
+
+<p>至于地图导航，老人天天在同一个站坐车，闭着眼都走得到。地图只放在二级页，给"偶尔去陌生地方"兜底就够——顺带还省掉了高德瓦片被限流的风险（见第 5 节）。</p>
+
+<h2><span class="num">09</span>V0.3：三个页面都通了</h2>
+
+<p>按确认的方案做完，实测通过。代码仍是 <code>bus-app/server.py</code> 单文件，运行 <code>python server.py</code>。</p>
+
+<table>
+<tr><th style="width:22%">页面</th><th style="width:39%">做了什么</th><th>实测结果</th></tr>
+<tr>
+<td><strong>首页</strong></td>
+<td>一张卡一条线。顶部线路号 + 往哪，中间巨大分钟数，底部虚线下面是反方向（小字，点了直接翻过去）。顶部左是站名、右是时间。</td>
+<td>36 路上行 17 分钟 / 还有 10 站；反方向往九山，等发车</td>
+</tr>
+<tr>
+<td><strong>站牌页</strong><br><span class="tag best">新增</span></td>
+<td>该站全部经过线路，一条一行：线路号、往哪、还有几分钟。有车的排前面，按时间升序。默认露 6 条，底下「还有 N 条线」点开。</td>
+<td>新城站返回 30 条线路方向，1 分钟内排序正确</td>
+</tr>
+<tr>
+<td><strong>线路详情</strong></td>
+<td>逐站站名纵向排开，时间轴串起来。蓝点 +「你在这」标的是石坦，橙点 +「车」标的是在途车辆。顶部固定：线路号、换个方向按钮、往哪、首末班、总站数。进页面自动滚到石坦并上下居中。</td>
+<td>上行 40 站、下行 45 站，换向后站序完整反转，石坦分别定位到第 29 / 第 15 站。当场 3 辆车在途，标记位置准确</td>
+</tr>
+</table>
+
+<h3>方向判断：网页版有个硬限制，得说清楚</h3>
+
+<p>你要的「用定位判断他在哪一侧站台」，技术上查过了：<strong>石坦站两个站台相距 46 米</strong>，坐标是分开的，能按距离算。</p>
+
+<p>但网页版有两个绕不过去的坎：</p>
+
+<ul>
+<li><strong>局域网 http 下浏览器根本不给定位权限</strong>，只认 HTTPS 和 localhost。所以手机上打开网页时，GPS 拿不到</li>
+<li>就算拿到了，46 米的间距要求定位精度在 20 米内。<strong>在家里（离站几百米）根本判断不了</strong>，只有站在站台边上才准</li>
+</ul>
+
+<p>所以这一版的做法是：<strong>主方向用「记住你上次坐哪个方向」</strong>，存在手机本地。点底部的「换个方向」会记住新的选择。这比 GPS 更可靠，因为老人出行高度规律——早上出门和晚上回家，方向和时段是绑死的。</p>
+
+<p>等做成原生 App（有真正的定位权限），再把 GPS 加进来做二次校正：离站台 40 米内用定位纠正，超过就用历史习惯。</p>
+
+<h3>顺手修掉的三个坑</h3>
+
+<ul>
+<li><strong>「小于 1 分钟」被算成 1 分钟</strong>，会让老人以为还有 60 秒。现在归零，显示「马上到」</li>
+<li><strong>「已到站」落到了兜底分支</strong>，显示成「稍后再看」。现在单独处理，显示「车在站上 / 快上车」</li>
+<li><strong>站牌页整列渲染不出来</strong>。原因是拼接 onclick 时用 JSON.stringify 生成了双引号，把 HTML 属性提前截断，整行 DOM 被吞掉。改成先算完整 URL 再拼</li>
+</ul>
+
+<h3>下一步</h3>
+
+<p>现在功能结构完整了，可以开始收拾界面。但在动 UI 之前，建议你先在手机上把三个页面点一遍，重点看两件事：</p>
+
+<ul>
+<li>线路详情滚到石坦之后，<strong>上面那 28 个站她会不会去翻</strong>（不翻说明列表只需露出前后几站）</li>
+<li>站牌页那个「还有 24 条线」，<strong>她会不会点开</strong>（不点说明 6 条够了，甚至可以砍到 4 条）</li>
+</ul>
+
+<p>这两条决定列表该多长，比调颜色重要得多。</p>
+
+<h2><span class="num">10</span>V0.4：搜索上线，轻轨只有站表</h2>
+
+<h3>先说清楚之前为什么你看不到</h3>
+
+<p>我前几轮给的是 <code>http://127.0.0.1:8765</code>。<strong>127.0.0.1 是本机地址，只有运行服务的那台电脑能打开</strong>，换台设备或者预览面板里都进不去。这是我的疏忽。</p>
+
+<p>现在改成：<strong>每一版都生成一个独立的 HTML 文件，数据已经内嵌在里面</strong>。双击就能打开，不需要服务、不需要联网、能直接发到手机上。</p>
+
+<div class="callout">
+<p><strong>文件名规则</strong>：<code>老人版公交_v版本号_演示.html</code>。每改一版就出一个新的，你随时可以对比哪一版更好。当前是 v0.4。</p>
+<p>文件里内置了 9 组真实数据快照，所以离线也能点。想查没内置的线路，会提示「演示版只内置了几个例子」——那是正常的，跑本地服务才能查全部。</p>
+</div>
+
+<h3>搜索：线路和站点一起搜</h3>
+
+<p>首页底部多了「查线路」按钮。输入框很大（21px），按回车或点「搜」都行。结果分两组：</p>
+
+<table>
+<tr><th style="width:22%">搜什么</th><th style="width:30%">实测结果</th><th>说明</th></tr>
+<tr><td>36</td><td>线路 3 条：36路、苍南JD36路、苍南QW36路</td><td>同名的外地线路也会出来，所以线路后面标了起终点</td></tr>
+<tr><td>S1</td><td>线路 2 条 + 站点 22 个</td><td>轻轨和普通公交混在同一个结果里</td></tr>
+<tr><td>石坦</td><td>站点命中，点进去就是站牌页</td><td>站名不用输全，两个字就够</td></tr>
+</table>
+
+<p>点线路 → 线路详情；点站点 → 站牌页。搜索结果里的线路只保留一条（不重复列上下行），进去再换方向。</p>
+
+<h3>轻轨：能读到，但没有实时数据</h3>
+
+<div class="callout warn">
+<p><strong>结论：温州 S1、S2 线的站点表完整，实时到站是空的。</strong></p>
+<p>S1 线 18 站（双瓯大道 → 瓯华 → 瓯江口 → 灵昆 → 机场 → 永中 → 奥体中心 → 瑶溪 → 科技城 → 龙腾路 → 三垟湿地 → 惠民路 → 龙霞路 → 德政 → 新桥 → 动车南 → 潘桥 → 桐岭），S2 线（清东路 ↔ 东山）也在。</p>
+<p>但接口返回的 <code>hasReal</code> 是 0，站牌查询里 <code>neartext</code> 和 <code>neardis</code> 两个字段<strong>全是空的</strong>，首末班时间也是空的。我又查了「科技城站（地铁站）」和「惠民路站（地铁站）」两个具体站点，返回都是空值，不是个别站点的问题。</p>
+</div>
+
+<p>所以轻轨只能做「站点顺序 + 换乘参考」，做不了「还有几分钟」。页面上已经如实处理：<strong>顶部有一条橙色提示「这条线没有实时到站数据，只能看站点顺序」</strong>，不会让人对着空白等。</p>
+
+<p>如果以后确实要轻轨实时数据，只有两条路：一是等掌上公交接进来，二是去温州铁投的官方渠道找。都不是我们这边能解决的。</p>
+
+<h3>当前完整功能</h3>
+
+<table>
+<tr><th style="width:34%">功能</th><th style="width:22%">状态</th><th>备注</th></tr>
+<tr><td>首页常坐线路到站</td><td><span class="tag best">已完成</span></td><td>一张卡一条线，反方向小字</td></tr>
+<tr><td>站牌页（该站所有线路）</td><td><span class="tag best">已完成</span></td><td>有车优先，前 6 条折叠</td></tr>
+<tr><td>线路详情（逐站 + 换向）</td><td><span class="tag best">已完成</span></td><td>自动定位我的站，标车在哪站</td></tr>
+<tr><td>搜索线路 / 站点</td><td><span class="tag best">已完成</span></td><td>V0.4 新增</td></tr>
+<tr><td>轻轨站点表</td><td><span class="tag mid">只读站表</span></td><td>无实时数据，页面已提示</td></tr>
+<tr><td>语音播报</td><td><span class="tag ref">已有</span></td><td>依赖系统 TTS，部分手机没声音</td></tr>
+<tr><td>语音输入</td><td>未做</td><td>槽位匹配方案已定</td></tr>
+<tr><td>到站提醒</td><td>未做</td><td>等 UI 定稿后做</td></tr>
+<tr><td>附近站点（按定位）</td><td>未做</td><td>需要原生定位权限</td></tr>
+</table>
+
+<h3>下一步</h3>
+
+<p>你现在打开那个 HTML 文件，把四个页面点一遍：首页 → 查线路（搜 S1）→ 站牌页 → 线路详情。看完告诉我两件事：</p>
+
+<ul>
+<li><strong>哪个页面的信息她看不懂</strong>，或者哪一步点不下去</li>
+<li><strong>搜索这个东西她会不会用</strong>——老人手动打字是难关，如果她根本不会打字，搜索就得改成语音输入，或者干脆去掉，只留收藏</li>
+</ul>
+
+<p>第二条决定搜索要不要继续投入。如果她不会打字，与其教她打字，不如让她只点三个大按钮。</p>
+
+<h2><span class="num">11</span>V0.5：合并成一页，去掉轻轨</h2>
+
+<h3>到站时间和站点列表放进同一张卡</h3>
+
+<p>原来首页只有「5 分钟」，要看站点得点进详情页，再点回来——反复切换确实烦。现在一页看全：</p>
+
+<pre><code>石坦站                          14:28
+┌────────────────────────────┐
+│ 36路              往 浙南科技城 │
+│  5 分钟                      │
+│  还有 4 站                    │
+│ ─────────────────────────── │
+│ ● 慎江路              [车]   │
+│ ○ 龙湾时尚邻里               │
+│ ○ 雁荡东路钱江路             │
+│ ○ 四明山路                   │
+│ ○ 温州东瓯中学               │
+│ ● 石坦              [你在这] │
+│ ○ 岩岙                      │
+│ ○ 兴元路                    │
+│ ○ 状元二期工业区             │
+│ ○ 周宅                      │
+│ ─────────────────────────── │
+│ 看全部 40 站 ›   反方向 往九山 12分钟 › │
+└────────────────────────────┘
+[查线路] [附近站点] [念一遍]</code></pre>
+
+<p>核心是<strong>站点窗口</strong>，不是把 40 站全铺出来：</p>
+
+<ul>
+<li>以石坦为中心，<strong>上面 3 站、下面 4 站</strong>，固定 8 行左右，一屏放得下</li>
+<li>车辆如果在窗口上方不远，<strong>窗口自动往上扩，把车纳进来</strong>——不然只写「车还在上面 6 站」，老人没有空间概念</li>
+<li>车实在太远（扩不到），才显示「车还在上面 X 站」</li>
+<li>底部一行两个动作：左边「看全部 40 站」进详情，右边「反方向 往九山 12 分钟」直接翻向，不用来回点</li>
+</ul>
+
+<p>这样首页就同时回答了三个问题：<strong>还有几分钟、车现在到哪了、我后面还有哪几站</strong>。</p>
+
+<h3>轻轨已去掉</h3>
+
+<p>搜索结果里的线路现在会<strong>过滤掉没有实时数据的</strong>。搜「S1」原本会列出 S1 线（点进去只有空站表），现在只剩真正能查到车的「微公交 S1 龙霞线」，底下还会写一行「另有 1 条线路没有实时到站数据，已隐藏」。</p>
+
+<p>不给一个点进去啥也没有的结果，比给一个「暂无数据」的页面更省事。轻轨站点表这个能力还在代码里，哪天接口接通了，把过滤去掉就回来了。</p>
+
+<h3>当前状态</h3>
+
+<table>
+<tr><th style="width:32%">功能</th><th style="width:24%">状态</th><th>说明</th></tr>
+<tr><td>首页（时间 + 站点窗口）</td><td><span class="tag best">已完成</span></td><td>一页看全，含反方向</td></tr>
+<tr><td>线路详情（全 40 站）</td><td><span class="tag best">已完成</span></td><td>从首页「看全部」进</td></tr>
+<tr><td>站牌页</td><td><span class="tag best">已完成</span></td><td>该站所有线路</td></tr>
+<tr><td>搜索（公交）</td><td><span class="tag best">已完成</span></td><td>已过滤无实时线路</td></tr>
+<tr><td>轻轨</td><td><span class="tag no">已移除</span></td><td>接口无实时数据</td></tr>
+<tr><td>语音播报</td><td><span class="tag ref">已有</span></td><td>依赖手机 TTS</td></tr>
+<tr><td>语音输入 / 到站提醒</td><td>未做</td><td>等 UI 定稿</td></tr>
+</table>
+
+<p>最新演示文件：<code>老人版公交_v0.5_演示.html</code></p>
+
+<h2><span class="num">12</span>V0.6：方向切换进卡片，界面重做</h2>
+
+<h3>换方向挪到卡片里</h3>
+
+<p>原来「反方向 往九山 12 分钟」缩在卡片底部一行小字里，不显眼。现在做成卡片右上角的胶囊按钮：</p>
+
+<pre><code>╭──────────────────────────────────╮
+│ 36路  往 浙南科技城   ( ⇄ 往九山 5分 ) │
+│                                  │
+│  23 分钟                          │
+│  还有 14 站                        │
+╰──────────────────────────────────╯</code></pre>
+
+<p>按钮上直接写反方向去哪、还有几分钟。<strong>看一眼就知道那边什么情况，点一下直接翻过去</strong>，不用先切再等加载。</p>
+
+<h3>视觉重做</h3>
+
+<table>
+<tr><th style="width:26%">项目</th><th style="width:34%">改之前</th><th>改之后</th></tr>
+<tr><td>配色</td><td>浅蓝 / 浅绿，偏灰</td><td>深蓝 <code>#0B4F8A</code> / 深绿 <code>#0A6B45</code>，对比度 7:1 以上</td></tr>
+<tr><td>站点列表</td><td>独立圆点，没有连接</td><td><strong>加了竖线时间轴</strong>，一串站点像一条线路，顺序一眼看懂</td></tr>
+<tr><td>圆角</td><td>卡片 16 / 按钮 14，不统一</td><td>卡片 22 / 按钮 18，统一</td></tr>
+<tr><td>字重</td><td>600 为主</td><td>标题 700、数字 800，层级拉开</td></tr>
+<tr><td>站牌页时间</td><td>按方向显示蓝/绿</td><td><strong>统一深色，只把 ≤2 分钟标橙</strong>。同一条站上的不同线路本来就没有方向含义，蓝绿交替是噪音</td></tr>
+</table>
+
+<h3>两个真 bug</h3>
+
+<div class="callout danger">
+<p><strong>一、车标记标反了。</strong>接口返回的车辆 <code>index</code> 是「正在驶向的站序」。我一开始的判断条件写反了，结果<strong>已经开过石坦的车也被标了「车」</strong>，老人会以为车还在前面，站在那儿干等。</p>
+<p>正确逻辑：<code>index &lt;= 我的站序</code> 才表示还没到。改完之后，上行那辆已过站的车不再显示，下行的车正确标在第 10 站。</p>
+<p><strong>二、「车还在上面 14 站」这种说法不成立。</strong>「上面」是界面方位，不是真实位置，而且和上方的「还有 14 站」重复。改成<strong>直接报站名：「车现在在 市中西医结合医院」</strong>。老人对站名有概念，对「14 站」没有。</p>
+</div>
+
+<h3>当前状态</h3>
+
+<p>最新演示文件：<code>老人版公交_v0.6_演示.html</code>（每版都会替换，保留最新一份）</p>
+
+<p>功能层面已经稳定，接下来我按适老化规范继续调细节，不再每版都问。以下几项是我准备自己推进的：</p>
+
+<ul>
+<li>对比度逐项核对，确保每个文字都在 4.5:1 以上</li>
+<li>触控区全部 ≥60×60dp（适老版要求），现在按钮够，站点行可以再放大</li>
+<li>加 TalkBack 的 <code>Semantics</code> 标签，让读屏软件能念出「36 路，还有 23 分钟，还有 14 站」</li>
+<li>「念一遍」的播报文案按当前页面内容调整，不只是首页</li>
+</ul>
+
+<div class="foot">
+<p>参考来源：GitHub 项目 README（my-bus-app / onebusaway-android / FindMyBus / amap_bus_plugin）· 工业和信息化部《移动互联网应用（APP）适老化通用设计规范》· 工信部《关于进一步抓好互联网应用适老化及无障碍改造专项行动实施工作的通知》（2021）· 烟台市公共数据开放平台公交到站预报接口文档</p>
+<p style="margin-top:8px">本文档不含任何针对掌上公交 App 的破解、去广告或改包方案。所有技术路径均基于独立开发。</p>
+</div>
+
+</div>
+</body>
+</html>

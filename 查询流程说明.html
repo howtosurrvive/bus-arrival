@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>公交查询 · 流程说明（第二版）</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  background:#F5F5F1;color:#1A1C1E;line-height:1.75;
+  padding:34px 20px 70px;-webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:820px;margin:0 auto}
+h1{font-size:28px;font-weight:800;letter-spacing:-.6px;margin-bottom:8px}
+.lead{font-size:15.5px;color:#6B7076;margin-bottom:8px}
+.core{
+  background:#0E3A63;color:#fff;border-radius:14px;padding:16px 22px;
+  font-size:16px;font-weight:600;line-height:1.7;margin:18px 0 30px;
+}
+.core b{color:#FFD79A}
+h2{font-size:19px;font-weight:700;margin:36px 0 14px;padding-left:12px;border-left:4px solid #0E3A63}
+h3{font-size:15.5px;font-weight:700;margin:22px 0 8px;color:#0E3A63}
+p{font-size:15px;color:#3C4046;margin-bottom:10px}
+.card{background:#fff;border:1px solid #E9E8E1;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.card p:last-child,.card ul:last-child{margin-bottom:0}
+ul{padding-left:22px;margin-bottom:10px}
+li{font-size:15px;color:#3C4046;margin-bottom:7px}
+li b{color:#111}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13.5px;background:#EDF2F8;color:#0E3A63;border-radius:5px;padding:1.5px 6px}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #E9E8E1;font-size:14.5px;margin-bottom:14px}
+th{background:#F0F0EA;text-align:left;padding:11px 13px;font-weight:600;color:#3C4046;font-size:13.5px;white-space:nowrap}
+td{padding:11px 13px;border-top:1px solid #F0F0EA;color:#3C4046;vertical-align:top}
+td:first-child{font-weight:600;color:#1A1C1E;white-space:nowrap}
+.flow{background:#fff;border:1px solid #E9E8E1;border-radius:16px;padding:24px 22px;margin-bottom:16px}
+.frow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:11px}
+.node{border-radius:9px;padding:8px 13px;font-size:13.5px;font-weight:600;white-space:nowrap}
+.node.home{background:#0E3A63;color:#fff}
+.node.mid{background:#EDF2F8;color:#0E3A63;border:1px solid #CFDDEB}
+.node.end{background:#2F7A55;color:#fff}
+.node.ghost{background:#F5F5F1;color:#8A8F94;border:1px dashed #D3D3CB}
+.arw{color:#B8BCC2;font-size:15px}
+.fnote{font-size:12.5px;color:#8A8F94;margin-left:4px}
+.sub{padding-left:22px;border-left:2px dashed #DDE1E6;margin:0 0 11px 8px}
+.tag{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:5px;background:#EAF1F8;color:#0E3A63;margin-right:6px;vertical-align:2px}
+.tag.o{background:#FDF0E3;color:#B4550E}
+.tag.g{background:#E7F3EC;color:#2F7A55}
+.warn{background:#FFF9F0;border:1px solid #F0D9B8;border-radius:14px;padding:16px 20px;margin-bottom:14px}
+.warn p{font-size:14.5px;color:#7A4A10;margin-bottom:7px}
+.warn p:last-child{margin-bottom:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>查询流程说明（第二版）</h1>
+<p class="lead">按「搜线路＝一次列全两个方向」「首页以查询为核心」重做后的结果。</p>
+
+<div class="core">
+一句话：<b>首页只干两件事 —— 搜，或者从这站的站牌里点一行。点完都进同一张到站卡片。</b>
+</div>
+
+<h2>一、页面流向</h2>
+
+<div class="flow">
+<div class="frow">
+  <span class="node home">首页</span>
+  <span class="fnote">搜索框 ＋ 附近站牌</span>
+</div>
+
+<div class="sub">
+  <div class="frow">
+    <span class="arw">├─</span>
+    <span class="node mid">搜线路号</span>
+    <span class="arw">→</span>
+    <span class="node mid">结果里两个方向摊开</span>
+    <span class="arw">→</span>
+    <span class="node end">到站卡片</span>
+  </div>
+  <div class="frow">
+    <span class="arw">├─</span>
+    <span class="node mid">搜站名</span>
+    <span class="arw">→</span>
+    <span class="node mid">站牌页</span>
+    <span class="arw">→</span>
+    <span class="node end">到站卡片</span>
+  </div>
+  <div class="frow" style="margin-bottom:0">
+    <span class="arw">└─</span>
+    <span class="node mid">点附近站牌某一行</span>
+    <span class="arw">→</span>
+    <span class="node end">到站卡片</span>
+    <span class="fnote">线路和方向一次选完</span>
+  </div>
+</div>
+</div>
+
+<h2>二、五个页面各管什么</h2>
+
+<table>
+<tr><th style="width:18%">页面</th><th style="width:26%">路由</th><th>作用</th></tr>
+<tr><td>首页</td><td><code>#/</code></td><td>搜索框 + 附近站牌列表</td></tr>
+<tr><td>搜索结果</td><td><code>#/search?kw=</code></td><td>线路（精确命中的直接摊开两方向）+ 站点</td></tr>
+<tr><td>到站卡片</td><td><code>#/b/线路/方向</code></td><td>大字分钟 + 全程站点 + 换方向</td></tr>
+<tr><td>站牌页</td><td><code>#/s/站名</code></td><td>该站所有线路，右上角可换站</td></tr>
+<tr><td>选方向</td><td><code>#/d/线路</code></td><td><b>降级为兜底</b>：只有同名线路（苍南JD36路这种）点进来才用</td></tr>
+<tr><td>逐站详情</td><td><code>#/l/</code></td><td><b>暂停用</b>：卡片已经能滚全部站点，功能重复</td></tr>
+</table>
+
+<h2>三、每个页面的预期行为</h2>
+
+<h3><span class="tag">1</span>首页</h3>
+<div class="card">
+<ul>
+<li>顶部：站名 + 时间，时间前一个绿点表示数据在跳（每 20 秒刷新）</li>
+<li><b>搜索框</b>：线路号、站名都能输，回车或点「搜」</li>
+<li><b>附近站牌</b>：这站所有线路方向，<b>有车的排在前面</b>，默认露 6 行</li>
+<li>每行是「线路号　往哪　还有几分钟」，<b>点一行 = 线路和方向一次选完</b></li>
+<li>这站车少时补一句「这站就这几趟车，想查别的线路用上面的搜索框」，不留大片空白</li>
+</ul>
+</div>
+
+<h3><span class="tag">2</span>搜索结果</h3>
+<div class="card">
+<ul>
+<li><b>线路号精确命中的那条，直接摊开成两行：</b><br>
+<code>36路　往 浙南科技城　40 站</code><br>
+<code>36路　往 九山　　　　45 站</code></li>
+<li>点任意一行 → 到站卡片。<b>不再经过中间那一步选方向。</b></li>
+<li>同名的其他线路（苍南JD36路、苍南QW36路）只列一行「起点 → 终点」，点进去才选方向</li>
+<li>站点组：点站名 → 站牌页</li>
+</ul>
+<p style="margin-top:10px;color:#8A8F94;font-size:14px">为什么只展开精确命中的那条：一次搜索最多展开 5 条线路，每条要查两次站表。只展开用户真正想坐的那条，速度快一倍以上，也不让结果变成长长一串。</p>
+</div>
+
+<h3><span class="tag g">3</span>到站卡片</h3>
+<div class="card">
+<ul>
+<li>顶部：线路号徽章、<b>往 XX</b>（长站名会自动换行，不截断）、右上「⇄ 换方向」</li>
+<li>中间：大字「13 分钟／车在站上／马上到」，下面一行「还有 8 站」</li>
+<li>下面：<b>全程站点可滚动</b>，进页面自动停在「你在这」，上方留一行看车开到哪</li>
+<li>底部：「全程 40 站」+「到站响铃」</li>
+<li>「换方向」是<b>替换当前页</b>，不往历史里堆 —— 连点几次再返回，直接回首页，不用按好几下</li>
+</ul>
+</div>
+
+<h3><span class="tag">4</span>站牌页</h3>
+<div class="card">
+<ul>
+<li>该站所有线路方向，有车的在前，默认 6 行可展开</li>
+<li>右上「换站 ›」→ 回搜索，换个站看</li>
+<li>点某一行 → 到站卡片</li>
+</ul>
+</div>
+
+<h2>四、一个必须说清的分支：线路不经过我的站</h2>
+
+<div class="warn">
+<p><b>到站卡片必须知道「你在哪个站」，否则算不出还有几分钟。</b></p>
+<p>从站牌页或首页列表点进来一定有站。但从搜索框直接搜「159 路」，159 根本不经过石坦 —— 这时卡片不编一个到站时间。</p>
+<p>改成显示「<b>不经过 石坦站</b>」，下面给全程站点和车辆当前位置，一行都不假造。</p>
+</div>
+
+<table>
+<tr><th style="width:36%">情况</th><th>卡片上看到什么</th></tr>
+<tr><td>线路经过我的站</td><td>大字「13 分钟」+「还有 8 站」+ 站点列表标「你在这」</td></tr>
+<tr><td>不经过</td><td>大字「不经过 石坦站」+ 全程站点 + 车开到哪（无「你在这」）</td></tr>
+</table>
+
+<h2>五、关于「附近站牌」</h2>
+
+<div class="card">
+<p>现在固定是<b>石坦站</b>。等手机定位接上以后，改成按距离选最近的车站，<b>前端不用动</b> —— 服务端只有 <code>HOME_STATION</code> 这一个参数要换。</p>
+<p>页面上不写「附近」以外的承诺，也不假装知道你在哪。</p>
+</div>
+
+<h2>六、这一版改了什么</h2>
+
+<table>
+<tr><th style="width:34%">项</th><th>状态</th></tr>
+<tr><td>首页</td><td><b>重做</b>：从「固定 36 路的大卡片」改成「搜索框 + 附近站牌列表」</td></tr>
+<tr><td>到站卡片</td><td><b>新路由</b> <code>#/b/线路/方向</code>，原来的卡片挪过来，可装任意线路</td></tr>
+<tr><td>搜索结果</td><td>精确命中的线路<b>直接摊开两个方向</b></td></tr>
+<tr><td>选方向页</td><td>降级为兜底，主流程不再经过</td></tr>
+<tr><td>换方向按钮</td><td>从「⇄ 往九山 18分」简化成「⇄ 换方向」，宽度让给方向名</td></tr>
+<tr><td>返回</td><td>回上一页；换方向用 replace 不压历史</td></tr>
+<tr><td>到站响铃 / 语音 / 定位 / 逐站详情</td><td><b>挂起</b>，等这一版用顺了再说</td></tr>
+</table>
+
+<p style="margin-top:18px;color:#6B7076;font-size:14px">端到端实测：首页 2 行 → 点首行 → <code>#/b/36路/1?st=石坦</code>，大字 11、换方向「⇄ 往九山 17分」→ 点换方向 → <code>#/b/36路/2</code> → 返回 → 直接回首页。</p>
+
+</div>
+</body>
+</html>

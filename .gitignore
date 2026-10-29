@@ -1,0 +1,16 @@
+# 网页/源码无关的临时产物
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+
+# 安卓构建中间件（源码保留，产物另存在 dist/）
+android/build/
+android/gen/
+
+# 内部工作数据
+.workbuddy/
+
+# 本地签名文件不要进仓库（在 D:\dev\busapp.keystore）
+*.keystore
+*.jks

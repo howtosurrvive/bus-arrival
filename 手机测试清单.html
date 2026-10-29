@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>公交到站 · 手机测试清单</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  background:#F5F5F1;color:#1A1C1E;line-height:1.75;
+  padding:32px 20px 64px;-webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:760px;margin:0 auto}
+h1{font-size:27px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px}
+.lead{font-size:15px;color:#6B7076;margin-bottom:26px}
+h2{
+  font-size:19px;font-weight:700;margin:34px 0 14px;padding-left:12px;
+  border-left:4px solid #0E3A63;
+}
+.card{background:#fff;border-radius:16px;padding:20px 22px;border:1px solid #E9E8E1;margin-bottom:14px}
+.card p{font-size:15px;color:#3C4046;margin-bottom:10px}
+.card p:last-child{margin-bottom:0}
+.addr{
+  font-family:ui-monospace,Menlo,Consolas,monospace;font-size:19px;font-weight:700;
+  color:#0E3A63;background:#EDF2F8;border-radius:8px;padding:8px 12px;
+  display:inline-block;margin:6px 0;letter-spacing:.3px;
+}
+ol,ul{padding-left:22px}
+li{font-size:15px;color:#3C4046;margin-bottom:8px}
+li b{color:#111}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #E9E8E1;font-size:14.5px}
+th{background:#F0F0EA;text-align:left;padding:11px 13px;font-weight:600;color:#3C4046;font-size:13.5px;white-space:nowrap}
+td{padding:11px 13px;border-top:1px solid #F0F0EA;color:#3C4046;vertical-align:top}
+td:first-child{font-weight:600;color:#1A1C1E;white-space:nowrap}
+.box{width:16px;height:16px;border:1.5px solid #C4C4BA;border-radius:4px;display:inline-block;vertical-align:-3px}
+.warn{background:#FFF9F0;border:1px solid #F0D9B8;border-radius:14px;padding:16px 20px;margin-bottom:14px}
+.warn p{font-size:15px;color:#7A4A10;margin-bottom:8px}
+.warn p:last-child{margin-bottom:0}
+.warn b{color:#8A3F00}
+.danger{background:#FDF0EF;border:1px solid #EFC9C4;border-radius:14px;padding:16px 20px;margin-bottom:14px}
+.danger p{font-size:15px;color:#8A3028;margin-bottom:8px}
+.danger p:last-child{margin-bottom:0}
+.tag{
+  display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:5px;
+  background:#0E3A63;color:#fff;margin-right:6px;vertical-align:2px;
+}
+.tag.g{background:#2F7A55}
+.tag.o{background:#C25E00}
+.note{font-size:13.5px;color:#8A8F94;margin-top:10px}
+.big{font-size:16px}
+hr{border:none;border-top:1px dashed #DDD;margin:26px 0}
+@media print{body{background:#fff;padding:0}.card,table{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>手机测试清单</h1>
+<p class="lead">照着做就行，不用记。关键是<strong>别说、别教、别提示</strong>——一教，测的就是她的记忆力，不是这个界面的可用性。</p>
+
+<h2>一、先把页面装到手机上（3 分钟）</h2>
+
+<div class="card">
+<p><b>第 1 步：</b>手机连上家里的 WiFi（必须和电脑同一个）。</p>
+<p><b>第 2 步：</b>打开手机浏览器（Chrome、vivo/OPPO/小米自带的都行），在地址栏输入：</p>
+<p><span class="addr">192.168.110.35:8765</span></p>
+<p><b>第 3 步：</b>能看到「石坦站」和分钟数，就成了。然后存成图标——</p>
+<ul>
+<li>Chrome / Edge：右上角「⋮」→ <b>添加到主屏幕</b> → 确认</li>
+<li>国产浏览器：底部或右上角「⋮」→ <b>添加到桌面</b></li>
+</ul>
+<p>存完之后主屏上会多一个深蓝色的图标，以后点它就行，不用再输地址。</p>
+</div>
+
+<div class="warn">
+<p><b>服务只在电脑开着的时候能用。</b>电脑关机、睡眠、或者那个黑色窗口被关掉，手机就打不开了。</p>
+<p>要用的时候：双击 <b>bus-app\启动.bat</b>，黑窗口留着别关。</p>
+</div>
+
+<h2>二、测之前，先自己走一遍（2 分钟）</h2>
+
+<div class="card">
+<p>这几条是排除环境问题，不然她一说"打不开"，你分不清是程序坏了还是网断了。</p>
+<table style="margin-top:10px">
+<tr><th style="width:56%">检查项</th><th>看到什么算正常</th></tr>
+<tr><td>首页有分钟数</td><td>大字，比如「13 分钟」</td></tr>
+<tr><td>数据是活的</td><td>等 15 秒，分钟数会自己往下走，右上角绿点在</td></tr>
+<tr><td>点「查线路」能搜</td><td>输 5，出来 5路、50路…</td></tr>
+<tr><td>点「念一遍」</td><td>有声音，或者没声音（<b>没声音也算已知情况</b>，手机缺中文语音包）</td></tr>
+</table>
+<p class="note">「念一遍」没声音不用管，那是手机没装中文语音引擎，不是页面坏了。</p>
+</div>
+
+<h2>三、正式测：分三段</h2>
+
+<h3 style="font-size:16px;font-weight:700;margin:22px 0 10px"><span class="tag">第一段</span>静默观察，5 分钟</h3>
+
+<div class="card">
+<p>把手机递给她，<b>只说一句</b>：「这个能看车还有多久，你看看。」</p>
+<p>然后<b>闭嘴</b>。不提示、不纠正、不帮她点。</p>
+<p><b>掐表记一件事：</b>从递过去，到她嘴里说出「还有 X 分钟」，用了多少秒。</p>
+<p class="big" style="margin-top:14px">　　　　________ 秒</p>
+<p class="note">10 秒以内＝首屏立住了。30 秒以上，或者她根本没找到那个数字，说明字号/位置还得改。</p>
+</div>
+
+<h3 style="font-size:16px;font-weight:700;margin:22px 0 10px"><span class="tag">第二段</span>五个任务，每个 1–2 分钟</h3>
+
+<div class="card">
+<p>一次只说一个任务，说完等她做。做不出来就换个任务，<b>不要教</b>。</p>
+<table style="margin-top:10px">
+<tr>
+<th style="width:8%">#</th>
+<th style="width:44%">你这么说</th>
+<th style="width:24%">测什么</th>
+<th>结果</th>
+</tr>
+<tr><td>1</td><td>「36 路还有几分钟？」</td><td>首屏</td><td><span class="box"></span> 独立　<span class="box"></span> 提示后　<span class="box"></span> 没做到</td></tr>
+<tr><td>2</td><td>「要是往回走，坐反方向，那边还有几分钟？」</td><td>换方向</td><td><span class="box"></span> 独立　<span class="box"></span> 提示后　<span class="box"></span> 没做到</td></tr>
+<tr><td>3</td><td>「后面第三站叫什么？」</td><td>看列表</td><td><span class="box"></span> 独立　<span class="box"></span> 提示后　<span class="box"></span> 没做到</td></tr>
+<tr><td>4</td><td>「查一下你平时坐的那条（说线路号）」</td><td>搜索</td><td><span class="box"></span> 独立　<span class="box"></span> 提示后　<span class="box"></span> 没做到</td></tr>
+<tr><td>5</td><td>「让它快到的时候响一声，提醒你出门」</td><td>提醒入口</td><td><span class="box"></span> 独立　<span class="box"></span> 提示后　<span class="box"></span> 没做到</td></tr>
+</table>
+<p class="note" style="margin-top:12px">第 5 条我预计她找不到——「到站响铃」我做成了卡片右下角的灰字。这一条测的就是这个取舍对不对。</p>
+</div>
+
+<h3 style="font-size:16px;font-weight:700;margin:22px 0 10px"><span class="tag">第三段</span>明天早上，真实场景</h3>
+
+<div class="card">
+<p>出门前让她自己看一次，<b>你不说话，只看她信不信这个数字</b>。</p>
+<p>重点看一件事：<b>她看完是直接走，还是站着犹豫、反复刷新。</b></p>
+<p class="note">犹豫说明她不确定这个数字准不准。这是这个 App 最要命的问题——比字大不大重要得多。</p>
+</div>
+
+<h2>四、记录：只记原话，不要转述</h2>
+
+<div class="card">
+<p>她说的每一句话都比你的总结有用。尤其是下面这四句——</p>
+<table style="margin-top:10px">
+<tr><th style="width:38%">她说的</th><th>说明什么</th></tr>
+<tr><td>「这是啥？」</td><td>某个词她不懂（多半是「往 XX」或者站名）</td></tr>
+<tr><td>「哪个？」</td><td>两个信息抢同一个注意力，层级没拉开</td></tr>
+<tr><td>「怎么点不动」</td><td>可点的区域太小，或者那行根本不是按钮</td></tr>
+<tr><td>沉默超过 5 秒</td><td>某一步卡了，卡在哪就记哪</td></tr>
+</table>
+<p class="note">有条件就录屏（安卓下拉菜单里有「屏幕录制」），比事后回忆准得多。</p>
+</div>
+
+<h2>五、连不上怎么办</h2>
+
+<div class="danger">
+<p><b>1. 页面打不开、转圈</b> → 先看电脑上那个黑色窗口还在不在。不在了就双击 <b>启动.bat</b>。</p>
+<p><b>2. 电脑上能开、手机不行</b> → 十有八九是手机连了别的 WiFi（比如连了 5G 而电脑在有线上；或者连了隔壁的）。两个连同一个路由器就行。</p>
+<p><b>3. 同一个 WiFi 还是不行</b> → 有些路由器开了「AP 隔离」，手机和电脑互相看不见。进路由器后台关掉它，或者把手机连到电脑开的热点。</p>
+<p><b>4. 换过 WiFi 之后打不开</b> → 电脑的 IP 变了。看黑色窗口里打印的「手机打开」那一行，用新地址。</p>
+</div>
+
+<h2>六、测之前先知道这几条限制</h2>
+
+<div class="card">
+<ul>
+<li><b>锁屏不响铃。</b>这是网页，页面关了就停。做成真正的 App 才能后台响。</li>
+<li><b>加到主屏后，返回手势会直接退回桌面。</b>因为整个应用只有一个页面，没有"上一层"。想退就先回到主屏再点进来。</li>
+<li><b>定位用不了。</b>局域网 http 下浏览器不给定位权限，所以"自动判断你在哪一侧站台"这版没有。方向靠记住你上次选的。</li>
+<li><b>电脑必须开着。</b>这不是云端服务，是跑在你电脑上的。</li>
+</ul>
+</div>
+
+<hr>
+<p class="note">测完把第二段那张表的勾、还有她说的原话发我。我按卡点改，不按猜改。</p>
+
+</div>
+</body>
+</html>

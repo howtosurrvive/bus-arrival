@@ -1,0 +1,293 @@
+# 交接报告 —— 公交到站（老人版）
+
+> 写给下一个接手的人（包括换一台设备继续干的他自己）。
+> 最后更新：2026-10-29　版本：网页 V0.7 / 安卓壳 V1.0.0
+
+---
+
+## 一、这东西是干什么的
+
+给家里老人用的公交车到站查询。老人要解决的问题只有一个：
+
+> **36 路还有几站到石坦？我该什么时候出门？**
+
+所以全部设计都围着这一句话转：字大、按钮少、不用注册、不看广告、三步查完。
+
+**不做的事**：不做全城公交地图、不做换乘规划、不做用户账号、不做定位导航、不做轻轨（数据质量差，已决定去掉）。
+
+---
+
+## 二、现在到哪一步了
+
+| 部分 | 状态 | 说明 |
+| --- | --- | --- |
+| 网页版（手机浏览器可用） | ✅ 可用 | `bus-app/启动.bat` 一键起服务，同一 WiFi 下手机浏览器就能用 |
+| 查询流程 | ✅ 定稿 | 首页搜索 → 直接列出两个方向 → 点方向 → 到站卡片 |
+| 白卡界面 | ✅ 定稿 | `skins.py` 里的 skin `c`（白卡 + V2 优化层） |
+| 到站响铃（页面开着时） | ✅ 可用 | 网页合成音 + 震动 + 横幅 |
+| **到站响铃（App 在后台）** | ✅ V1.0.0 已打通 | 安卓壳 + 前台服务轮询，`dist/公交到站-1.0.0.apk` |
+| 语音输入 | ⏸ 暂缓 | 老人念不准（「石坦站」说成「石坦村」），要做近义词匹配再说 |
+| 定位「附近站牌」 | ⏸ 暂缓 | 家到石坦两个站台只隔 46 米，定位分不出来；先留接口 |
+
+---
+
+## 三、目录结构
+
+```
+项目根/
+├── bus-app/                  网页版 + 本地服务（核心）
+│   ├── server.py             单文件：Python 标准库 HTTP 服务 + 接口 + 页面 JS
+│   ├── skins.py              三套界面皮肤（白卡 / 深色 / 白卡+V2 优化）
+│   └── 启动.bat              双击启动（会把局域网地址打印出来）
+├── android/                  安卓壳（让响铃能在后台响）
+│   ├── AndroidManifest.xml
+│   ├── src/com/leina/bus/
+│   │   ├── MainActivity.java WebView 壳 + 设置页 + 给网页的桥
+│   │   ├── BusService.java   前台服务：轮询 + 响铃 + 通知
+│   │   ├── Api.java          调本地服务 /api/board
+│   │   └── Prefs.java        地址、线路、方向、站点、阈值（SharedPreferences）
+│   ├── res/                  图标与文案
+│   └── build.sh              一条命令打包 APK
+├── dist/公交到站-1.0.0.apk   装到手机的成品
+├── *.html                    说明页、离线演示、测试清单
+├── README.md                 快速上手
+└── HANDOFF.md                本文件
+```
+
+---
+
+## 四、怎么跑起来
+
+### 4.1 网页版
+
+1. 电脑装 Python 3（**第一步必须勾 "Add python.exe to PATH"**）
+2. 双击 `bus-app/启动.bat`
+3. 窗口里会打印两行地址：`http://127.0.0.1:8765`（电脑自己用）和
+   `http://192.168.x.x:8765`（手机用）
+4. 手机连**同一个 WiFi**，浏览器打开第二个地址
+
+> 手机打不开？八成是 Windows 防火墙拦了 8765 端口。允许 Python 通过专用网络即可。
+> 数据全部由电脑上的这个服务转发到 `h5.mygolbs.com`，所以电脑不开，手机就查不了。
+
+### 4.2 安卓 App
+
+1. 把 `dist/公交到站-1.0.0.apk` 传到手机（微信文件传输助手、数据线都行）
+2. 手机上点安装（会提示「未知来源」，允许一次）
+3. 打开「公交到站」，默认地址已经写好了；连不上就点「改地址」填电脑上的那个地址
+4. 进到站卡片 → 右上角「到站响铃」→ 选 2 站 / 3 站 / 5 站
+
+**后台响铃怎么发生的**：网页把「看哪条线、还剩几站响」通过 `AndroidBridge` 交给原生层 →
+原生前台服务每 30 秒问一次本地服务 → 到条件就响铃 + 震动 + 弹通知。
+网页自己被切后台冻结了也不影响，因为真正干活的是原生服务。
+
+---
+
+## 五、数据从哪来
+
+全部来自掌上公交的公开接口，**没有第三方依赖库**（Python 标准库直接发 HTTP 请求）。
+
+- 接口地址：`https://h5.mygolbs.com/ApiData.do`
+- 城市：`温州市`
+- 常用命令号：
+
+| CMD | 干什么 | 缓存在哪 |
+| --- | --- | --- |
+| 103 | 线路站表（上下行站序） | 长缓存，站表基本静态 |
+| 104 | 该方向在途车辆（车开到第几站） | 短缓存 |
+| 110 | 站名搜索 | 短 |
+| 114 | 线路搜索 | 短 |
+| 115 | 某站所有经过线路的实时到站 | 短 |
+| 209 | 同名站台坐标（马路哪一侧） | 短 |
+
+> 接口属于第三方公开服务，**没有公开的稳定性承诺**。哪天真挂了，改的是
+> `server.py` 里 `api_post()` 上面的 `API` 常量 —— 换成别的数据源时，
+> 只要把 `fetch_station_lines / fetch_stops / fetch_buses` 三个函数返回结构保住，
+> 页面一行都不用改。
+
+---
+
+## 六、代码地图
+
+### 6.1 `bus-app/server.py`（约 1750 行，Python）
+
+```
+常量       CITY / HOME_STATION(石坦) / HOME_LINE(36路) / PORT(8765)
+工具       api_post() 发请求并解析 JSON
+           _minutes/_meters/_num   把「小于1分钟」「9.3公里」这类文本解析成数
+           _status()               把接口的节点状态归一成 coming/here/waiting/...
+           short_name()            去掉「(不用于上下客)」这类括号、去掉「首末站」后缀
+取数       fetch_station_lines()   CMD115  某站所有线路的实时到站
+           fetch_stops()           CMD103  某线某方向的站序
+           fetch_buses()           CMD104  在途车辆
+           fetch_platforms()       CMD209  站台坐标
+组装       window_stops()          截出「我附近 ±5 站」的窗口；只收车还没过的
+           build_home()             首页：站牌列表
+           build_board()            到站卡片数据（本项目的主对象）
+           build_station()          某个站有哪些车
+           build_dirs()             一条线的两个方向（搜线路时用）
+           build_line()             一条线一个方向的完整详情
+           build_search()           搜线路 / 搜站名（各截断 10 / 8 条，带排序）
+页面       page_html()             组 HTML（CSS 来自 skins.py，JS 是常量）
+           JS 常量                 页面全部前端逻辑，见下
+HTTP       Handler.do_GET          路由：/ /api/* /icon.png /manifest.json /demo /_preview
+```
+
+**前端 JS 的关键函数**（都在 `server.py` 的 `JS` 常量里）：
+
+```
+viewHome()      首页（站牌列表 + 搜索框）
+viewBoard()     到站卡片（进线路详情后看到的那个页面）
+viewStation()   站牌页（某站所有车）
+viewSearch()    搜索结果页
+homeCard()      生成到站卡片的 HTML
+checkRemind()   每轮轮询后判断要不要响铃
+pickAt(n)/turnOff()  响铃阈值设置
+syncWatch()     ★ 新增：把「看哪条线、响几站」同步给安卓壳
+bridge()        ★ 新增：检测 AndroidBridge，没有就静默跳过
+centerMyStop()  把「你在这」滚到屏幕合适的位置
+```
+
+### 6.2 `bus-app/skins.py`
+
+三套皮肤：`SKINS = {"a": CSS_A, "b": CSS_B, "c": CSS_A + V2_OVERRIDE}`
+线上默认用 `c`（白卡 + V2 优化层）；加 `?skin=a` 可以切回旧版对比。
+
+白卡配色：底 `#FAFAF7`、卡片纯白、主字 `#1A1C1E`、线路蓝 `#0E3A63`、紧急橙 `#DA6B1C`、正常绿 `#1F9E5A`。
+
+### 6.3 `android/src/com/leina/bus/`
+
+| 文件 | 职责 |
+| --- | --- |
+| `MainActivity.java` | WebView 壳；首次启动显示地址设置页；连不上显示自救页；`Bridge` 类是网页能调的 4 个方法：`setWatch / getWatch / server / settings` |
+| `BusService.java` | 前台服务。状态栏常驻一行「正在看着 36 路·石坦站」；每 30 秒轮询；到条件响铃（ToneGenerator 走闹钟音量）+ 震动 + 通知 |
+| `Api.java` | 只做一件事：问 `http://<地址>/api/board?line=&dir=&station=`，解析成 `Board{status, stations, minutes, toShort}` |
+| `Prefs.java` | 五个字段：server / line / dir / station / at |
+
+**网页 ↔ 原生的桥**（`server.py` 的 `JS` 里）：
+
+```js
+function bridge(){ return (typeof AndroidBridge !== "undefined") ? AndroidBridge : null; }
+```
+
+浏览器里没有这个对象 → 所有调用静默跳过，**网页行为一行不变**。
+App 里则会在进到站卡片时调 `setWatch(line, dir, station, 阈值)`，
+阈值变化（`pickAt`/`turnOff`）时再同步一次。
+
+---
+
+## 七、怎么打包 APK
+
+### 7.1 工具链（已经装在 D 盘）
+
+```
+D:\dev\jdk17\jdk-17.0.20.1+1     JDK 17（Temurin）
+D:\dev\android-sdk\build-tools\34.0.0   aapt2 / d8 / zipalign / apksigner
+D:\dev\android-sdk\platforms\android-34\android.jar
+D:\dev\busapp.keystore            签名密钥（别删，删了更新装不上）
+```
+
+> 不用 Gradle、不用 Android Studio、不用联网下依赖 —— 一条 `build.sh` 全搞定，
+> 一分钟出包。改一行 Java 就能出包，是这个方案最大的好处。
+
+### 7.2 命令
+
+```bash
+cd android
+bash build.sh              # 自动探测本机 IP 写进默认地址
+bash build.sh 192.168.1.9  # 手动指定
+```
+
+产物：`android/build/bus-1.0.0.apk`
+
+`build.sh` 干的事（和 Gradle 等价，只是手写）：
+
+```
+aapt2 compile/link   资源 + AndroidManifest → base.apk + R.java
+javac --release 8    Java → class
+d8                   class → classes.dex
+zip                  classes.dex 塞进 base.apk
+zipalign -f 4        对齐
+apksigner sign       用 D:\dev\busapp.keystore 签名（v1+v2）
+```
+
+### 7.3 换设备重新装工具链
+
+1. JDK 17：清华镜像 `https://mirrors.tuna.tsinghua.edu.cn/Adoptium/17/jdk/x64/windows/`
+   （GitHub 的 release 直连在这台机器上不通，别在那儿耗时间）
+2. build-tools：`https://dl.google.com/android/repository/build-tools_r34-windows.zip`
+   解压后目录名是 `android-14`，**要改名成 `34.0.0`** 再放进 `build-tools/`
+3. platform：`https://dl.google.com/android/repository/platform-34-ext7_r03.zip`
+   解压后是 `android-34`，放进 `platforms/`
+4. 签名密钥丢了就用 `keytool` 重新生成一个（换密钥会导致覆盖安装失败，先卸载再装）
+
+---
+
+## 八、几个关键决定（改之前先看一眼，别走回头路）
+
+1. **不拆别人的 APK、不去广告、不重签名。** 侵权且不稳。自己写一层壳，数据走公开接口。
+2. **不重定位、不自建小程序。** 定位在局域网 http 页面上浏览器不给权限；小程序审核和开发成本都不划算。
+3. **接口层全在 Python 一侧。** 网页和 App 共用同一套逻辑，改数据解析只改一个文件。
+4. **响铃阈值用「还有几站」而不是分钟。** 温州堵车，分钟数不可信；站数是硬的。
+5. **`build_board` 里 `bus_at` 只收 `index < focus` 的车。** 早先用 `<=`，会出现
+   「还有 18 站」和「车在本站」同时显示的自相矛盾。
+6. **车还有几站拿不到时，宁可显示「—」，也不编一个分钟数。**
+7. **搜「5」会命中 77 条线路**，所以截断到 10 条并排序，标题写「线路 10 / 共 77 条」。
+8. **网页里响铃和原生响铃不能同时开。** `checkRemind()` 里 `if(bridge()) return;`，
+   由原生统一负责，避免响两遍。
+9. **换方向用 `replaceState`**，不往浏览历史里压记录，否则返回键会一层层退回去。
+
+---
+
+## 九、已知限制（不是 bug，是现状）
+
+| 限制 | 说明 | 影响的场景 |
+| --- | --- | --- |
+| 电脑必须开着 | App 的数据来自电脑上的 `server.py` | 电脑关机 → App 连不上、提醒不响 |
+| 手机必须和电脑同一 WiFi | 地址是局域网 IP | 出门在外就用不了 |
+| 后台被杀 | 小米/华为/OPPO 会杀后台应用 | 需要在系统里给「公交到站」加「后台运行 / 省电策略白名单」 |
+| 重启手机后提醒要手动恢复 | 没做开机自启 | 重启后打开一次 App 就会自动接回来 |
+| 通知权限 | Android 13+ 要用户授权 | 不授权就不弹通知（铃声和震动仍会响） |
+| 静音/勿扰 | 闹钟音量在勿扰下可能被拦 | 提醒时把手机调成响铃 |
+| 数据源无保证 | 第三方公开接口 | 接口若改协议，要改 `server.py` 里的取数函数 |
+| 轻轨没有 | 轻轨站表查得到但没有实时数据 | 已决定不做 |
+
+---
+
+## 十、下一步建议（按性价比排）
+
+1. **把服务搬到一个常开的机器上**（家里的小主机 / 云服务器 / NAS）。
+   这一步做完，「电脑必须开着」这个最大限制就消失了，App 只剩下一个壳。
+2. **开机自启 + 省电白名单引导页**：装好后弹一次提示，教用户把 App 加进白名单。
+3. **接口做缓存与降级**：上游超时或返回异常时，页面要显示「暂时查不到」而不是空白。
+4. **近义词匹配做语音输入**：先做「石坦村 → 石坦」这种站名纠错，再谈语音。
+5. **多城市**：现在写死了「温州市」，改成按定位或手选城市即可，`CITY` 一个常量的事。
+
+---
+
+## 十一、换一台设备怎么接着干
+
+```bash
+git clone <仓库地址>            # 或直接下载 zip
+cd <项目目录>
+cd bus-app && python server.py  # 网页版立刻能跑（Python 3.8+ 即可）
+```
+
+要改界面 → 改 `bus-app/skins.py`，刷新浏览器即可。
+要改数据逻辑 → 改 `bus-app/server.py` 的 `fetch_*` / `build_*`。
+要改 App → 改 `android/src/com/leina/bus/*.java`，然后：
+
+```bash
+cd android && bash build.sh
+```
+
+**唯一需要重新准备的是构建工具链**（见 7.3），源码本身不依赖任何第三方包。
+
+---
+
+## 十二、给下一个自己的提醒
+
+- 改完界面**一定要在真手机上再看一眼** —— 桌面浏览器和 360px 宽的手机差别很大，
+  `skins.py` 里的 `V2_OVERRIDE` 就是为 374px / 359px 小屏补的断点。
+- 服务端的「还有几站」是**站数**，不是分钟；分钟只是顺带给的参考值。
+- 任何时候都不要在文档或代码注释里写「已发出」「客户已读」这类没法验证的话 ——
+  这个项目里也一样：能验证的写事实，不能验证的写「未确认」。

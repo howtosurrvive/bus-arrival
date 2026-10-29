@@ -1,0 +1,106 @@
+#!/bin/bash
+# 打包 APK。工具链在 D 盘，源码在本目录。
+#   D:\dev\jdk17        JDK 17
+#   D:\dev\android-sdk  build-tools 34.0.0 + platforms/android-34
+set -e
+
+BASE=/d/dev
+JDK="$BASE/jdk17/jdk-17.0.20.1+1"
+SDK="$BASE/android-sdk"
+BT="$SDK/build-tools/34.0.0"
+ANDROID_JAR="$SDK/platforms/android-34/android.jar"
+OUT="build"
+
+export PATH="$JDK/bin:$PATH"
+JAVA="$JDK/bin/java.exe"
+
+# 电脑的局域网地址，写进 App 当默认值（手机在同一 WiFi 下就免配置）
+DEF_IP="${1:-}"
+if [ -z "$DEF_IP" ]; then
+  DEF_IP=$(python -c "
+import socket
+s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+try:
+    s.connect(('223.5.5.5',80)); print(s.getsockname()[0])
+except Exception: print('')
+finally: s.close()" 2>/dev/null)
+fi
+DEF_SERVER=""
+[ -n "$DEF_IP" ] && DEF_SERVER="http://$DEF_IP:8765"
+
+echo "==> 默认服务器地址: ${DEF_SERVER:-（留空，装好后手填）}"
+
+rm -rf "$OUT"
+mkdir -p "$OUT/gen" "$OUT/classes" "$OUT/dex" "$OUT/src"
+
+# 1. 生成一份改了默认地址的 Prefs.java
+sed "s|@DEFAULT_SERVER@|$DEF_SERVER|" src/com/leina/bus/Prefs.java > "$OUT/src/Prefs.java"
+for f in src/com/leina/bus/*.java; do
+  [ "$(basename "$f")" = "Prefs.java" ] && continue
+  cp "$f" "$OUT/src/"
+done
+
+# 2. 资源
+"$BT/aapt2.exe" compile --dir res -o "$OUT/res.zip"
+"$BT/aapt2.exe" link \
+  -o "$OUT/base.apk" \
+  -I "$ANDROID_JAR" \
+  --manifest AndroidManifest.xml \
+  -R "$OUT/res.zip" \
+  --java "$OUT/gen" \
+  --min-sdk-version 21 \
+  --target-sdk-version 34 \
+  --version-code 1 \
+  --version-name 1.0.0 \
+  --auto-add-overlay
+echo "==> 资源编译完成"
+
+# 3. javac
+if ! "$JDK/bin/javac.exe" --release 8 -nowarn -encoding UTF-8 \
+  -classpath "$ANDROID_JAR" \
+  -d "$OUT/classes" \
+  "$OUT/src"/*.java "$OUT/gen"/com/leina/bus/R.java > "$OUT/javac.log" 2>&1; then
+  echo "！！Java 编译失败："
+  cat "$OUT/javac.log"
+  exit 1
+fi
+echo "==> Java 编译完成"
+
+# 4. dex
+CLASSES=$(find "$OUT/classes" -name "*.class" | tr '\n' ' ')
+"$JAVA" -cp "$BT/lib/d8.jar" com.android.tools.r8.D8 \
+  --lib "$ANDROID_JAR" --release --min-api 21 \
+  --output "$OUT/dex" $CLASSES
+echo "==> dex 生成完成"
+
+# 5. 把 classes.dex 塞进 apk
+python - "$OUT/base.apk" "$OUT/dex/classes.dex" <<'PY'
+import sys, zipfile
+apk, dex = sys.argv[1], sys.argv[2]
+z = zipfile.ZipFile(apk, 'a', zipfile.ZIP_DEFLATED)
+z.write(dex, 'classes.dex')
+z.close()
+print("   dex 已入包")
+PY
+
+# 6. 对齐
+"$BT/zipalign.exe" -f 4 "$OUT/base.apk" "$OUT/aligned.apk"
+
+# 7. 签名（首次运行时生成一个本地 keystore，放在 D 盘，别删）
+KS="$BASE/busapp.keystore"
+if [ ! -f "$KS" ]; then
+  "$JDK/bin/keytool.exe" -genkeypair -v -keystore "$KS" \
+    -alias bus -keyalg RSA -keysize 2048 -validity 10000 \
+    -storepass bus123456 -keypass bus123456 \
+    -dname "CN=LeiNa Valve, OU=Bus, O=LeiNa, L=Wenzhou, ST=Zhejiang, C=CN" >/dev/null 2>&1
+  echo "==> 新建签名文件 $KS"
+fi
+
+"$JAVA" -jar "$BT/lib/apksigner.jar" sign \
+  --ks "$KS" --ks-pass pass:bus123456 --key-pass pass:bus123456 \
+  --v1-signing-enabled true --v2-signing-enabled true \
+  --out "$OUT/bus-1.0.0.apk" "$OUT/aligned.apk"
+
+"$JAVA" -jar "$BT/lib/apksigner.jar" verify "$OUT/bus-1.0.0.apk"
+echo "==> 签名校验通过"
+ls -lh "$OUT/bus-1.0.0.apk"
