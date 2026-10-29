@@ -47,11 +47,22 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" \
-            --title "公交到站 老人版 ${GITHUB_REF_NAME}" \
-            --notes-file release-notes.md \
-            dist/bus-arrival-*.apk \
-          || gh release upload "${GITHUB_REF_NAME}" dist/bus-arrival-*.apk --clobber
+          APK=$(ls dist/bus-arrival-*.apk | head -1)
+          NAME=$(basename "$APK")
+          # 已经存在就先把旧附件清掉 —— 同名文件被替换时 CDN 会缓存住旧内容，
+          # 用户会下到旧包，页面上的 SHA-256 就对不上了
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            for a in $(gh release view "${GITHUB_REF_NAME}" --json assets --jq '.assets[].name'); do
+              gh release delete-asset "${GITHUB_REF_NAME}" "$a" || true
+            done
+            gh release upload "${GITHUB_REF_NAME}" "$APK"
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              --title "公交到站 老人版 ${GITHUB_REF_NAME}" \
+              --notes-file release-notes.md \
+              "$APK"
+          fi
+          echo "附件：$NAME"
 
       - name: 打印下载链接
         run: |

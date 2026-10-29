@@ -131,15 +131,28 @@ p = os.path.join(os.path.dirname(apk), "apk-info.json")
 open(p, "w", encoding="utf-8").write(json.dumps(info, ensure_ascii=False, indent=2))
 print("==> dist/apk-info.json 已更新")
 
-# 顺手把下载页上的校验值和证书指纹同步过来 —— 每次重新签名，APK 的哈希都会变，
-# 页面上的数不跟着改，就会出现「页面写的和实际文件对不上」，那是不能留的。
+# 文件名带上哈希：同名文件被替换时，GitHub/CDN 会把旧内容缓存住，
+# 用户会下到旧包，页面上「对不上就别装」就成了空话。名字唯一就不会错配。
+import glob, shutil
+dist_dir = os.path.dirname(apk)
+sha8 = info["sha256"][:8]
+newname = "bus-arrival-%s-%s.apk" % (info["version"], sha8)
+target = os.path.join(dist_dir, newname)
+shutil.copyfile(apk, target)          # 先复制，再清理旧的
+for f in glob.glob(os.path.join(dist_dir, "bus-arrival-*.apk")):
+    if os.path.abspath(f) != os.path.abspath(target):
+        os.remove(f)
+print("==> dist/%s" % newname)
+
+# 把下载页上的文件名、校验值、证书指纹同步过来
 idx = os.path.abspath(os.path.join(os.path.dirname(apk), "..", "index.html"))
 try:
     html = open(idx, encoding="utf-8").read()
+    html = re.sub(r"bus-arrival-[0-9.]+(-[0-9a-f]{8})?\.apk", newname, html)
     html = re.sub(r"(对不上就别装<br><code>)[0-9a-f]{64}", r"\g<1>" + info["sha256"], html)
     html = re.sub(r"(证书指纹<br><code>)[0-9a-f]{64}", r"\g<1>" + cert, html)
     open(idx, "w", encoding="utf-8").write(html)
-    print("==> index.html 上的 SHA-256 / 证书指纹已同步")
+    print("==> index.html 上的文件名 / SHA-256 / 证书指纹已同步")
 except Exception as e:
     print("!! 同步 index.html 失败：", e)
 PY
