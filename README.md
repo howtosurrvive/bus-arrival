@@ -26,7 +26,15 @@
 
 ## 装成 App
 
-`dist/公交到站-1.0.0.apk` 传到手机装上即可（Android 6 以上）。
+手机安装包在 `dist/bus-arrival-1.0.0.apk`（25 KB，已 v1+v2 签名）。
+
+**手机上怎么下载**：仓库根目录的 `index.html` 是专门的下载页，开了 GitHub Pages 之后，
+手机浏览器打开 `https://howtosurrvive.github.io/bus-arrival/` 就能下载；
+不装 Pages 也能用这三条现成直链：
+
+- https://cdn.jsdelivr.net/gh/howtosurrvive/bus-arrival@v1.0.1/dist/bus-arrival-1.0.0.apk
+- https://raw.githubusercontent.com/howtosurrvive/bus-arrival/v1.0.1/dist/bus-arrival-1.0.0.apk
+
 默认服务器地址已经写进包里，手机和电脑在同一个 WiFi 下就不用再配置。
 
 ## 打包 APK

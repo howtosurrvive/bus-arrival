@@ -103,4 +103,33 @@ fi
 
 "$JAVA" -jar "$BT/lib/apksigner.jar" verify "$OUT/bus-1.0.0.apk"
 echo "==> 签名校验通过"
-ls -lh "$OUT/bus-1.0.0.apk"
+
+# 8. 归档到 dist/，并记下校验值与证书指纹（手机下载页要显示这两样）
+mkdir -p ../dist
+cp "$OUT/bus-1.0.0.apk" "../dist/bus-arrival-1.0.0.apk"
+"$JAVA" -jar "$BT/lib/apksigner.jar" verify --print-certs "../dist/bus-arrival-1.0.0.apk" > "$OUT/certs.txt"
+python - "$OUT" <<'PY'
+import hashlib, json, os, sys, datetime
+out = sys.argv[1]
+apk = os.path.join(os.path.dirname(out), "..", "dist", "bus-arrival-1.0.0.apk")
+apk = os.path.abspath(apk)
+data = open(apk, "rb").read()
+cert = ""
+for line in open(os.path.join(out, "certs.txt"), encoding="utf-8", errors="ignore"):
+    if "SHA-256 digest" in line:
+        cert = line.split("digest:")[1].strip()
+        break
+info = {
+    "file": os.path.basename(apk),
+    "version": "1.0.0", "versionCode": 1,
+    "size": len(data),
+    "sha256": hashlib.sha256(data).hexdigest(),
+    "cert": cert, "signed": "v1+v2",
+    "built": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+}
+p = os.path.join(os.path.dirname(apk), "apk-info.json")
+open(p, "w", encoding="utf-8").write(json.dumps(info, ensure_ascii=False, indent=2))
+print("==> dist/apk-info.json 已更新")
+PY
+
+ls -lh "$OUT/bus-1.0.0.apk" ../dist/
