@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>APK 安装与测试 · 公交到站 老人版 V1.0</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  background:#FAFAF7;color:#1A1C1E;line-height:1.7;padding:24px 18px 60px;
+  max-width:640px;margin:0 auto;
+}
+h1{font-size:25px;color:#0E3A63;letter-spacing:-.4px;margin-bottom:6px}
+.sub{color:#8A8F94;font-size:14px;margin-bottom:22px}
+.card{background:#fff;border:1px solid #EAE9E2;border-radius:20px;padding:20px 18px;margin-bottom:14px;
+      box-shadow:0 1px 3px rgba(22,32,43,.04)}
+h2{font-size:19px;color:#0E3A63;margin-bottom:10px;display:flex;align-items:center;gap:9px}
+.num{width:26px;height:26px;border-radius:50%;background:#0E3A63;color:#fff;font-size:14px;
+     display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+ol,ul{margin:6px 0 0 20px}
+li{margin-bottom:7px}
+b{color:#0E3A63}
+code{background:#F3F3EE;border-radius:6px;padding:2px 7px;font-size:14px;color:#0E3A63;
+     font-family:ui-monospace,Menlo,Consolas,monospace;word-break:break-all}
+.path{background:#0E3A63;color:#fff;border-radius:10px;padding:12px 14px;font-size:15px;margin:8px 0 4px;
+      font-family:ui-monospace,Menlo,Consolas,monospace}
+.warn{background:#FDF3E7;border:1px solid #F1CC9E;color:#8A4A12;border-radius:14px;padding:14px 16px;margin:10px 0;font-size:15px}
+.ok{background:#EAF5EE;border:1px solid #CDE6D8;color:#1B7A46;border-radius:14px;padding:14px 16px;margin:10px 0;font-size:15px}
+table{width:100%;border-collapse:collapse;margin-top:8px;font-size:15px}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid #EFEEE8;vertical-align:top}
+th{color:#8A8F94;font-weight:600;font-size:13px}
+.todo{color:#DA6B1C}
+.foot{color:#8A8F94;font-size:13px;margin-top:22px;text-align:center}
+</style>
+</head>
+<body>
+
+<h1>APK 安装与测试</h1>
+<div class="sub">公交到站 老人版 V1.0.0 · 2026-10-29 · 安卓 6.0 以上</div>
+
+<div class="card">
+  <h2>一、装到手机上</h2>
+  <div class="path">D:\公交APK\公交到站-1.0.0.apk</div>
+  <ul>
+    <li>把这个文件传到手机：微信「文件传输助手」发给自己、数据线拷、或者存到网盘再下都行。</li>
+    <li>在手机上点这个文件 → 系统会提示「未知来源」→ 允许一次 → 完成。</li>
+    <li>桌面出现蓝色图标「公交到站」。</li>
+  </ul>
+  <div class="warn">装不上多半是这两件事：① 手机管家拦了未知应用安装，去「安装包管理/安全」里放行；② 从微信直接点安装会被拦，先「保存到手机」再从文件管理器里装。</div>
+</div>
+
+<div class="card">
+  <h2>二、填上电脑的地址</h2>
+  <ul>
+    <li>电脑上双击 <code>bus-app\启动.bat</code>，黑窗口别关。</li>
+    <li>黑窗口里有一行 <code>http://192.168.x.x:8765</code>，把这个地址记下来。</li>
+    <li>手机连<b>同一个 WiFi</b>，打开「公交到站」。</li>
+    <li>包里已经预填了构建时的地址，如果正好是现在这个，直接点「开始使用」；不一样就清空重填。</li>
+  </ul>
+  <div class="warn">打不开、显示「连不上」：① 电脑和手机是不是同一个 WiFi；② Windows 防火墙有没有放行 Python 走「专用网络」；③ 电脑上的服务还在不在（黑窗口是不是被关了）。</div>
+</div>
+
+<div class="card">
+  <h2>三、查一趟车</h2>
+  <ul>
+    <li>首页直接搜「36」，或者点下面「站牌」里石坦那一条。</li>
+    <li>页面会直接列出<b>两个方向</b>，点要坐的那个方向。</li>
+    <li>进到到站卡片：大字写着「还有几站」「几分钟」，下面就是车开到哪了。</li>
+    <li>卡片上有「⇄ 换方向」，不用返回再选。</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2>四、开到站响铃（重点）</h2>
+  <ul>
+    <li>在到站卡片上点右上角<b>「到站响铃」</b>，选 <b>2 站</b>（或 3 站 / 5 站）。</li>
+    <li>面板底部会变成绿字「切到后台、锁屏也会响」—— 这一行是绿的，说明 App 认出来了。</li>
+    <li>状态栏会多一条常驻通知：<code>正在看着 36 路 · 石坦站</code>。</li>
+  </ul>
+  <div class="ok">这一版和网页版最大的不同：网页一被切到后台就被系统冻住，JavaScript 不再跑，网页版的响铃就哑了。App 里干活的是一个<b>前台服务</b>，每 30 秒自己问一次电脑上的服务，所以按 Home 键、锁屏、甚至切到微信，车到了照样会响。</div>
+</div>
+
+<div class="card">
+  <h2>五、专门测「后台响铃」这一步</h2>
+  <table>
+    <tr><th>动作</th><th>该看到什么</th></tr>
+    <tr><td>进 36 路石坦卡片，设 2 站</td><td class="todo">横幅提示「响铃已开」</td></tr>
+    <tr><td>按 Home 键退到桌面</td><td>状态栏留着「正在看着 36 路」</td></tr>
+    <tr><td>锁屏</td><td>通知还在（通知栏下拉能看到）</td></tr>
+    <tr><td>等车到第 2 站左右</td><td>响铃 + 震动 + 通知「车还有 2 站」</td></tr>
+    <tr><td>车到站</td><td>再响一组 + 通知「车到站了」</td></tr>
+  </table>
+  <div class="warn">如果退到桌面过一会儿通知不见了 —— 那是国产系统把它杀了。解法：设置里搜「公交到站」→ 电池/省电策略 → 选「不限制后台运行」；小米是「省电策略 → 无限制」，华为是「应用启动管理 → 关闭自动管理」。这个必须设一次，否则后台响了铃会漏。</div>
+</div>
+
+<div class="card">
+  <h2>六、已知会遇到的毛病</h2>
+  <table>
+    <tr><th>现象</th><th>原因 / 怎么办</th></tr>
+    <tr><td>收不到到站通知</td><td>安卓 13 以上要单独允许通知权限。首次打开会弹窗，点允许。</td></tr>
+    <tr><td>响铃没声音</td><td>手机静音了、或者开了勿扰模式。响铃走的是「闹钟音量」，设成响铃档。</td></tr>
+    <tr><td>电脑关了 App 就没反应</td><td>这一版的数据来自电脑上的服务，电脑不开就查不了。下一版会把服务搬到常开的机器上。</td></tr>
+    <tr><td>手机重启后提醒没了</td><td>还没做开机自启。重新打开一次 App 就接回来了。</td></tr>
+    <tr><td>App 装不上（提示签名冲突）</td><td>之前装过别的签名的版本，先卸载再装。</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2>七、换地址</h2>
+  <ul>
+    <li>App 里连不上时，点「改地址」就能重新填。</li>
+    <li>已经能连上、只是想换：到站响铃面板最下面那行灰色的「服务器 … · 点了能改」，点它。</li>
+  </ul>
+</div>
+
+<div class="foot">公交到站 老人版 V1.0.0 · 源码与交接说明在项目根目录 HANDOFF.md</div>
+
+</body>
+</html>
