@@ -1,0 +1,47 @@
+name: 发布下载页
+
+# 只把「下载页 + 安装包」发布到 GitHub Pages，源码（bus-app/、android/）不发布 ——
+# 仓库是私有的，但 Pages 站点是公开的，把源码放上去等于公开了。
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'index.html'
+      - 'dist/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 只挑下载页和安装包
+        run: |
+          rm -rf site
+          mkdir -p site
+          cp index.html site/index.html
+          cp -r dist site/dist
+          ls -laR site | head -40
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'site'
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
