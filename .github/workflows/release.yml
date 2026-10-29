@@ -1,0 +1,58 @@
+name: 发布安装包
+
+# 打一个 v 开头的 tag，就自动把 APK 变成一条 Release 附件，
+# 手机上可以稳定下载这个链接：
+#   https://github.com/howtosurrvive/bus-arrival/releases/download/<tag>/bus-arrival-1.0.0.apk
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 看看有什么包
+        run: |
+          ls -la dist/
+          sha256sum dist/*.apk
+
+      - name: 写发布说明
+        run: |
+          APK=$(ls dist/bus-arrival-*.apk | head -1)
+          NAME=$(basename "$APK")
+          {
+            echo "## 公交到站 老人版"
+            echo
+            echo "手机上直接点下面的文件下载安装。"
+            echo
+            echo "| 项 | 值 |"
+            echo "| --- | --- |"
+            echo "| 文件 | \`$NAME\` |"
+            echo "| 大小 | $(du -h "$APK" | cut -f1) |"
+            echo "| SHA-256 | \`$(sha256sum "$APK" | cut -d' ' -f1)\` |"
+            echo "| 签名 | v1+v2（本仓库固定密钥） |"
+            echo
+            echo "权限：联网查车、发通知、后台盯站、震动、调提示音音量。"
+            echo "没有定位、通讯录、相机、麦克风、短信。"
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: 生成 Release 并上传安装包
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "公交到站 老人版 ${GITHUB_REF_NAME}" \
+            --notes-file release-notes.md \
+            dist/bus-arrival-*.apk \
+          || gh release upload "${GITHUB_REF_NAME}" dist/bus-arrival-*.apk --clobber
+
+      - name: 打印下载链接
+        run: |
+          echo "https://github.com/howtosurrvive/bus-arrival/releases/download/${GITHUB_REF_NAME}/bus-arrival-1.0.0.apk"
