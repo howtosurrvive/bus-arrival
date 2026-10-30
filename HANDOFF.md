@@ -1,7 +1,7 @@
 # 交接报告 —— 公交到站（老人版）
 
 > 写给下一个接手的人（包括换一台设备继续干的他自己）。
-> 最后更新：2026-10-29　版本：网页 V0.7 / 安卓壳 V1.0.0
+> 最后更新：2026-10-30　版本：网页 V1.0 / 安卓壳 V1.0.0
 
 ---
 
@@ -25,7 +25,8 @@
 | 查询流程 | ✅ 定稿 | 首页搜索 → 直接列出两个方向 → 点方向 → 到站卡片 |
 | 白卡界面 | ✅ 定稿 | `skins.py` 里的 skin `c`（白卡 + V2 优化层） |
 | 到站响铃（页面开着时） | ✅ 可用 | 网页合成音 + 震动 + 横幅 |
-| **到站响铃（App 在后台）** | ✅ V1.0.0 已打通 | 安卓壳 + 前台服务轮询，`dist/公交到站-1.0.0.apk` |
+| **到站响铃（App 在后台）** | ✅ V1.0.0 已打通 | 安卓壳 + 前台服务轮询，`dist/bus-arrival-1.0.0-<sha8>.apk` |
+| 安装包分发 | ✅ 可用 | 打 tag 自动发 Release，手机可直链下载（见 7.4） |
 | 语音输入 | ⏸ 暂缓 | 老人念不准（「石坦站」说成「石坦村」），要做近义词匹配再说 |
 | 定位「附近站牌」 | ⏸ 暂缓 | 家到石坦两个站台只隔 46 米，定位分不出来；先留接口 |
 
@@ -48,8 +49,19 @@
 │   │   └── Prefs.java        地址、线路、方向、站点、阈值（SharedPreferences）
 │   ├── res/                  图标与文案
 │   └── build.sh              一条命令打包 APK
-├── dist/公交到站-1.0.0.apk   装到手机的成品
-├── *.html                    说明页、离线演示、测试清单
+├── dist/
+│   ├── bus-arrival-1.0.0-<sha8>.apk   成品；文件名带哈希（见 7.4）
+│   ├── apk-info.json         大小 / SHA-256 / 证书指纹，build.sh 自动生成
+│   └── icon-192.png
+├── .github/workflows/
+│   ├── release.yml           打 tag 自动发 Release（安装包作为附件）
+│   └── pages.yml             自动把下载页发到 GitHub Pages（只发页面和 apk）
+├── index.html                对外的手机下载页（Pages 发布的是它的 site/ 副本）
+├── APK安装与测试.html        手机端安装与验收步骤
+├── 手机测试清单.html          人工验收清单
+├── 查询流程说明.html          交互规格（改 UI 前必读）
+├── 老人版公交App方案.html     立项期方案论证（历史文档，决策由来）
+├── 老人版公交_离线演示.html   不联网也能看的界面演示
 ├── README.md                 快速上手
 └── HANDOFF.md                本文件
 ```
@@ -71,10 +83,21 @@
 
 ### 4.2 安卓 App
 
-1. 把 `dist/公交到站-1.0.0.apk` 传到手机（微信文件传输助手、数据线都行）
-2. 手机上点安装（会提示「未知来源」，允许一次）
-3. 打开「公交到站」，默认地址已经写好了；连不上就点「改地址」填电脑上的那个地址
-4. 进到站卡片 → 右上角「到站响铃」→ 选 2 站 / 3 站 / 5 站
+安装包在 `dist/bus-arrival-1.0.0-<sha8>.apk`（文件名里的哈希见 7.4）。传到手机的方式有三种：
+
+- **手机上直接下载**（推荐）：打开 `index.html` 这个下载页（Pages 地址见 7.4），点按钮；
+  或直接用 Release 直链：
+  `https://github.com/howtosurrvive/bus-arrival/releases/download/v1.0.1/bus-arrival-1.0.0-624ec3d1.apk`
+- **电脑传过去**：微信「文件传输助手」发给自己、数据线拷、网盘，都行；
+- **数据线直连**（手机开了 USB 调试时）：`adb install dist/bus-arrival-*.apk`，
+  顺便 `adb reverse tcp:8765 tcp:8765`，手机就能用 `http://127.0.0.1:8765` 访问电脑上的服务，
+  绕开「手机和电脑不在同一网段」的问题。adb 在 `D:\dev\platform-tools`。
+
+装上之后：
+
+1. 手机上点安装（会提示「未知来源」，允许一次）
+2. 打开「公交到站」，默认地址已经写好了；连不上就点「改地址」填电脑上的那个地址
+3. 进到站卡片 → 右上角「到站响铃」→ 选 2 站 / 3 站 / 5 站
 
 **后台响铃怎么发生的**：网页把「看哪条线、还剩几站响」通过 `AndroidBridge` 交给原生层 →
 原生前台服务每 30 秒问一次本地服务 → 到条件就响铃 + 震动 + 弹通知。
@@ -103,6 +126,67 @@
 > `server.py` 里 `api_post()` 上面的 `API` 常量 —— 换成别的数据源时，
 > 只要把 `fetch_station_lines / fetch_stops / fetch_buses` 三个函数返回结构保住，
 > 页面一行都不用改。
+
+### 5.1 本地服务的接口契约
+
+浏览器和安卓壳都只跟这 8 个接口打交道，不直接碰上游。路由在 `server.py` 的 `do_GET`：
+
+| 接口 | 参数 | 返回 | 谁在用 |
+| --- | --- | --- | --- |
+| `/` | `?skin=a\|b\|c` | 整页 HTML | 浏览器 / WebView |
+| `/api/board` | `line`、`dir`(1\|2)、`station` | 到站卡片（见下） | WebView、安卓后台服务 |
+| `/api/station` | `name` | 某站所有线路的实时到站 | 站牌页 |
+| `/api/line` | `name`、`dir`、`focus` | 一条线一个方向的完整站表 | 逐站详情页 |
+| `/api/home` | 无 | 首页站牌列表 | 首页 |
+| `/api/dirs` | `line`、`station` | 一条线的两个方向 | 选方向那一步 |
+| `/api/search` | `kw` | 搜线路 / 搜站名（各截断 10 / 8 条） | 搜索页 |
+| `/api/platforms` | `station` | 同名站台坐标 | 未接（定位用） |
+
+`/api/board` 的返回结构（安卓壳 `Api.java` 只取其中 4 个字段）：
+
+```json
+{
+  "ok": true,
+  "station": "石坦",
+  "line": "36路", "dir": "1",
+  "main":  { "status": "coming", "stations": 17, "minutes": 28,
+             "toShort": "浙南科技城", "node": "17站", "dist": "28分钟/9.3公里",
+             "order": 29 },
+  "other": { "status": "waiting", "stations": null, "minutes": null,
+             "toShort": "九山", ... },
+  "win":  { "rows": [ {"i": 1, "name": "...", "mine": false, "bus": false} ] },
+  "passes": true,        // 这条线是否经过这个站
+  "total": 40,
+  "hasReal": true,
+  "updated": "16:42"
+}
+```
+
+`status` 的取值只有这几个：`coming`（在途，有分钟和站数）、`here`（就在本站）、
+`waiting`（等待发车）、`passed`（已过站）、`closed`（收班）、`unknown`（查不到）、
+`noroute`（这站不走这条线）。**安卓壳的响铃判断完全依赖 `status` 与 `stations`**，
+改这两个字段的含义会直接影响后台响铃。
+
+### 5.2 硬编码配置项
+
+现在**没有任何环境变量**，全部是 `server.py` 顶部的常量（要改就改这里，然后重启服务）：
+
+| 常量 | 当前值 | 含义 |
+| --- | --- | --- |
+| `API` | `https://h5.mygolbs.com/ApiData.do` | 上游接口 |
+| `CITY` | `温州市` | 城市名，换城市改这里 |
+| `HOME_STATION` | `石坦` | 首页默认站点 |
+| `HOME_LINE` | `36路` | 默认线路 |
+| `PORT` | `8765` | 本地服务端口 |
+| `SEARCH_MAX_LINES` / `SEARCH_MAX_STATIONS` | `10` / `8` | 搜索结果截断 |
+
+安卓侧的配置在 `Prefs.java`（SharedPreferences，5 个字段：`server`/`line`/`dir`/`station`/`at`），
+其中 `server` 的默认值由 `build.sh` 在打包时写死成本机局域网地址。
+
+### 5.3 本项目没有数据库
+
+全部状态都在内存和手机本地存储里，没有 schema、没有迁移、没有持久化。
+**别去找数据库结构**，也别为了「存历史记录」引入数据库 —— 需求里没有这件事。
 
 ---
 
@@ -197,7 +281,8 @@ bash build.sh              # 自动探测本机 IP 写进默认地址
 bash build.sh 192.168.1.9  # 手动指定
 ```
 
-产物：`android/build/bus-1.0.0.apk`
+产物：`android/build/bus-1.0.0.apk`，同时归档到 `dist/bus-arrival-1.0.0-<sha8>.apk`
+（`<sha8>` = 该包 SHA-256 的前 8 位，脚本自动算，见 7.4）。
 
 `build.sh` 干的事（和 Gradle 等价，只是手写）：
 
@@ -208,6 +293,7 @@ d8                   class → classes.dex
 zip                  classes.dex 塞进 base.apk
 zipalign -f 4        对齐
 apksigner sign       用 D:\dev\busapp.keystore 签名（v1+v2）
+再拷一份到 dist/，写 apk-info.json，并改写 index.html 里的文件名与校验值
 ```
 
 ### 7.3 换设备重新装工具链
@@ -219,6 +305,47 @@ apksigner sign       用 D:\dev\busapp.keystore 签名（v1+v2）
 3. platform：`https://dl.google.com/android/repository/platform-34-ext7_r03.zip`
    解压后是 `android-34`，放进 `platforms/`
 4. 签名密钥丢了就用 `keytool` 重新生成一个（换密钥会导致覆盖安装失败，先卸载再装）
+
+### 7.4 发版流程与版本约定
+
+```bash
+cd android && bash build.sh      # 出包，并自动同步 dist/ 与下载页
+git add -A && git commit -m "..."
+git push origin master
+git tag -f -a v<版本号> -m "..." && git push --force origin refs/tags/v<版本号>
+```
+
+推完 tag，`release.yml` 会自动建一条 Release 并把安装包作为附件传上去。
+
+三条约定，改之前先看一眼：
+
+1. **文件名带哈希**（`bus-arrival-1.0.0-<sha8>.apk`）。因为 GitHub 与 CDN 会缓存同名文件 ——
+   同名覆盖后用户会下到旧包，页面上的 SHA-256 就对不上。名字唯一就不会错配。
+2. **不要手改下载页上的哈希和证书指纹**，`build.sh` 会自动改写。手改必然对不上。
+3. **仓库 tag 与 APK 版本号目前不对齐**：tag 是 `v1.0.1`，包内 `versionName` 是 `1.0.0`。
+   历史 tag 不动（改了 Release 链接会全失效）；**往后打 tag 用 APK 的真实版本号**，
+   并同步改 `android/build.sh` 里的 `version-code` / `version-name` 和 `Prefs` 的默认地址。
+
+### 7.5 改完必跑的三条校验
+
+项目没有自动化测试（不想为它新增一堆实体），靠这三条守住底线：
+
+```bash
+# 1. Python 语法
+python -c "import ast;ast.parse(open('bus-app/server.py',encoding='utf-8').read())"
+
+# 2. 前端 JS 语法（server.py 里的 JS 常量导出后校验）
+cd bus-app && python -c "
+import server; open('_p.js','w',encoding='utf-8').write(server.JS)" && node --check _p.js && rm _p.js
+
+# 3. 服务起得来，接口返回的是事实不是编的
+cd bus-app && python server.py &
+curl -s "http://127.0.0.1:8765/api/board?line=36路&dir=1&station=石坦"
+# 看 main.status / main.stations / main.minutes 是否自洽：
+# 有分钟数时 stations 不能是 null；stations 不该是负数或离谱的大数
+```
+
+改安卓侧则多一条：`cd android && bash build.sh` 必须跑通（编译 + 签名 + 校验通过）。
 
 ---
 
@@ -250,6 +377,8 @@ apksigner sign       用 D:\dev\busapp.keystore 签名（v1+v2）
 | 静音/勿扰 | 闹钟音量在勿扰下可能被拦 | 提醒时把手机调成响铃 |
 | 数据源无保证 | 第三方公开接口 | 接口若改协议，要改 `server.py` 里的取数函数 |
 | 轻轨没有 | 轻轨站表查得到但没有实时数据 | 已决定不做 |
+| 下载页还没上线 | GitHub Pages 需要在仓库 Settings → Pages 里把 Source 选成「GitHub Actions」，`pages.yml` 才会跑 | 在此之前手机走 Release 直链下载 |
+| 手机和电脑可能不在同一网段 | 电脑只有有线网卡（192.168.110.x），手机走 WiFi，网段不同就访问不到 | 用数据线 `adb reverse`，或让路由器关掉 AP 隔离 |
 
 ---
 
