@@ -2048,7 +2048,13 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
-        for k, v in (extra or {"Cache-Control": "no-store"}).items():
+        # 默认不许缓存：页面和接口一变，手机就该跟着变。
+        # 传了 extra 时是「合并」不是「替换」—— 早先写成 extra or {...}，
+        # 结果给首页加 Vary:Cookie 的那一刻，no-store 就被挤掉了，
+        # WebView 有可能一直拿旧页面。extra 里的同名头仍然优先（图标要靠它缓存）。
+        headers = {"Cache-Control": "no-store"}
+        headers.update(extra or {})
+        for k, v in headers.items():
             self.send_header(k, v)
         self.end_headers()
         self.wfile.write(data)
