@@ -34,8 +34,9 @@ rm -rf "$OUT"
 mkdir -p "$OUT/gen" "$OUT/classes" "$OUT/dex" "$OUT/src"
 
 # 0. 图标：跟网页配色同源，形状一致，只换底色。
-#    第二个参数选 warm / sky / deep，默认暖橘。
-ICON_V="${2:-warm}"
+#    第二个参数选 deep / warm / sky，要跟默认配色对上：
+#    深蓝 c → deep（默认）、暖橘 d → warm、晴空 e → sky。
+ICON_V="${2:-deep}"
 python - "$ICON_V" <<'PY'
 import sys
 sys.path.insert(0, "../bus-app")

@@ -742,6 +742,33 @@ V2_OVERRIDE = r"""
   .btnrow{padding-top:8px;padding-bottom:8px}
   .btn{height:58px}
 }
+
+/* ---------------------------------------------------------- 设置面板：配色 */
+/* 面板现在有响铃和配色两段，小屏（640 高）会顶到屏幕外，给它自己能滚 */
+.sheet{max-height:90vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+       scrollbar-width:none}
+.sheet::-webkit-scrollbar{display:none}
+.sheet .sect-t{
+  font-size:13.5px;font-weight:600;color:#96998F;letter-spacing:.2px;
+  margin:20px 2px 8px;padding-top:14px;border-top:1px solid #EFEEE7;
+}
+.sheet .sect-t:first-of-type{margin-top:18px;padding-top:0;border-top:0}
+.themes{display:flex;gap:9px;margin-top:4px}
+.th{
+  flex:1;height:78px;border:1.5px solid #E2E1D9;border-radius:15px;background:#fff;
+  font-family:inherit;cursor:pointer;padding:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+}
+.th i{width:22px;height:22px;border-radius:7px;display:block}
+.th b{font-size:15px;font-weight:600;color:#2A2E33}
+.th small{font-size:11.5px;font-weight:500;color:#8A8F94}
+.th.sel{border-color:#0E3A63;background:#F4F8FC;box-shadow:inset 0 0 0 1px #0E3A63}
+.th.sel b{color:#0E3A63}
+.thhint{font-size:12.5px;color:#96998F;margin-top:10px;text-align:center}
+.nav .setlink{
+  font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;
+  color:#6B7076;background:#F2F1EA;border:none;border-radius:9px;padding:5px 11px;
+}
 """
 
 # ---------------------------------------------------------------- 两套新配色
@@ -806,32 +833,6 @@ def _tint(css, mapping):
                    lambda m: mapping.get(m.group(0).upper(), m.group(0)), css)
 
 
-# f 暖阳：按用户给的色卡做的。
-#   橙红 #ED6D41 / 橙 #F08119 / 黄橙 #F4B01B —— 这三个色对着白底只有 1.8~2.9:1，
-#   当文字色老人看不清，所以只让它们出现在图形、点缀和背景里；
-#   文字色取橙红压深一档 #B8451F（5.2:1），大数字取 #D9532A（3.9:1，80px 字号够用）。
-_THEME_EMBER = {
-    "#0E3A63": "#B8451F", "#123A5C": "#A03A18", "#0B2743": "#6B2410",
-    "#0F2537": "#7A2A13", "#071A2D": "#3F1508", "#0B4F8A": "#D9532A",
-    "#1A1C1E": "#2E241E", "#16202B": "#3A2A1F", "#2A2E33": "#3E2F26",
-    "#2E3238": "#46362C", "#3A4048": "#524136", "#3C4046": "#56453A",
-    "#55595E": "#6B5648",
-    "#6B7076": "#7D6656", "#7A7F74": "#85705E", "#8A8F94": "#9A8574",
-    "#96998F": "#A2937F", "#7B7E74": "#877260", "#8E9188": "#9B8A78",
-    "#FAFAF7": "#FFFAF3", "#EFEEE7": "#FAEDDD", "#F0EFE8": "#FBEEE0",
-    "#EAE9E2": "#F3E6D8", "#DFE3E8": "#EFDECC", "#CFCEC5": "#E4D3C0",
-    "#D5DAE1": "#EBD9C6",
-    # 提醒与紧急：用色卡里的橙，但文字压深保证看得清
-    "#DA6B1C": "#C2410C", "#F5A524": "#F08119", "#C2410C": "#A8350B",
-    "#A8480B": "#9B330D", "#B4550E": "#A23A12", "#B0600E": "#A8451A",
-    "#E0761C": "#D9532A", "#231500": "#3A1E0E",
-    # 状态色与浅底：绿色压成柔和的橄榄绿，不抢暖色
-    "#1F9E5A": "#3F7A5A", "#A33224": "#A8350B",
-    "#FDF0E3": "#FDEBD8", "#FDF0EE": "#FDE8E1",
-    "#EAF1F8": "#FEF0E4", "#F4F8FC": "#FFF6EC",
-    "#E8F0F7": "#FDEEDF",
-}
-
 _BASE = CSS_A + V2_OVERRIDE
 
 SKINS = {
@@ -841,5 +842,11 @@ SKINS = {
     "d": _tint(_BASE, _THEME_WARM),   # 暖橘
     # 晴空版：响铃入口单独用暖色点缀，别跟着主色一起变蓝，否则提醒就藏起来了
     "e": _tint(_BASE, _THEME_SKY) + "\n.remlink{color:#C9452B}\n",
-    "f": _tint(_BASE, _THEME_EMBER),  # 暖阳（色卡版）
 }
+
+# 用户能在「设置 → 手机配色」里选的三套。顺序就是面板里显示的顺序。
+THEME_CHOICES = (
+    ("c", "深蓝", "跟原来一样"),
+    ("d", "暖橘", "看着暖和"),
+    ("e", "晴空", "清爽明亮"),
+)

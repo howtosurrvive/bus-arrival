@@ -20,14 +20,16 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 try:
-    from skins import SKINS
+    from skins import SKINS, THEME_CHOICES
 except Exception:          # 皮肤文件缺失时退回内置样式，不影响可用
     SKINS = {}
+    THEME_CHOICES = (("c", "深蓝", "跟原来一样"),)
 
 API = "https://h5.mygolbs.com/ApiData.do"
 CITY = "温州市"
 HOME_STATION = "石坦"
 HOME_LINE = "36路"
+DEFAULT_SKIN = "c"         # 没选过配色时用这套（白卡 + V2 优化层）
 PORT = 8765
 
 # 主屏图标：不依赖 Pillow，用标准库直接编 PNG。
@@ -45,10 +47,6 @@ ICON_THEMES = {
     "sky":  {"top": (152, 215, 247), "bot": (77, 167, 232),
              "body": (255, 255, 255), "glass": (17, 69, 106),
              "wheel": (17, 69, 106), "lamp": (255, 209, 102)},
-    # 暖阳：用户给的色卡（黄橙 → 橙 → 橙红）
-    "ember": {"top": (244, 176, 27), "bot": (237, 109, 65),
-              "body": (255, 255, 255), "glass": (74, 42, 24),
-              "wheel": (74, 42, 24), "lamp": (240, 129, 25)},
     # 深蓝：原来的观感，作为对照保留
     "deep": {"top": (24, 80, 128), "bot": (14, 58, 99),
              "body": (255, 255, 255), "glass": (14, 58, 99),
@@ -1017,6 +1015,31 @@ function openSheet(){
   for(var i = 0; i < os.length; i++){
     os[i].className = "opt" + (parseInt(os[i].getAttribute("data-n"), 10) === at ? " sel" : "");
   }
+  var cs = curSkin(), ts = document.querySelectorAll(".th");
+  for(var j = 0; j < ts.length; j++){
+    ts[j].className = "th" + (ts[j].getAttribute("data-sk") === cs ? " sel" : "");
+  }
+}
+
+/* 当前配色：服务端渲染时写在 body 上，前端不用自己猜 */
+function curSkin(){
+  return document.body.getAttribute("data-sk") || "c";
+}
+
+/* 换配色：记进 cookie，然后重新进一次页面（不是 reload —— 要顺手清掉地址里的
+   ?skin=，否则从对比链接进来的人换了色，刷新还是老配色，会以为没生效）。
+   清完参数 hash 还在原地，老人换个颜色不会被弹回首页。 */
+function setSkin(v){
+  if(v === curSkin()){ closeSheet(); return; }
+  /* 离线演示是单个 html 文件，没有服务端也没有 cookie，换不了色 —— 别让人点了没反应 */
+  if(location.protocol === "file:"){
+    closeSheet();
+    showBanner("演示版换不了", "装到手机上就能换", false);
+    setTimeout(hideBanner, 2600);
+    return;
+  }
+  document.cookie = "sk=" + v + ";path=/;max-age=31536000;SameSite=Lax";
+  location.replace(location.pathname + location.hash);
 }
 
 function closeSheet(){
@@ -1131,6 +1154,7 @@ function viewHome(){
     if(!lines.length){ el.innerHTML = errBox("这个站没有线路", "换个站试试"); return; }
 
     var html = '<div class="nav"><span class="t">'+esc(p.station)+'站</span>'
+             + '<button class="setlink" onclick="openSheet()">设置</button>'
              + '<span class="r" id="clock"><i class="live"></i>'+p.updated+'</span></div>';
 
     html += '<div class="sbar">'
@@ -1789,9 +1813,18 @@ route();
 
 
 
-/* 调试用：地址加 ?sheet=1 直接弹出响铃面板，方便截图核对 */
-if(location.search.indexOf("sheet=1") >= 0){
-  setTimeout(function(){ try{ openSheet(); }catch(e){} }, 2600);
+/* 调试用：地址加 ?sheet=1 直接弹出设置面板，方便截图核对。
+   ?sheet=now 连滑入动画一起去掉 —— 无头浏览器截图会卡在动画中间。 */
+if(location.search.indexOf("sheet=") >= 0){
+  setTimeout(function(){
+    try{
+      if(location.search.indexOf("sheet=now") >= 0){
+        var sh = document.getElementById("sheet");
+        if(sh) sh.style.transition = "none";
+      }
+      openSheet();
+    }catch(e){}
+  }, 2600);
 }
 
 /* 调试用：地址加 ?pick=站序 自动选中那一站，方便截图核对估算条
@@ -1806,6 +1839,13 @@ if(location.search.indexOf("sheet=1") >= 0){
     if(row){ hit = true; clearInterval(t); pickStop(row); }
   }, 250);
   setTimeout(function(){ clearInterval(t); }, 9000);
+})();
+
+/* 调试用：地址加 ?autoskin=d 自动点一下那个配色，验证「换了就记住」整条链路 */
+(function(){
+  var m = location.search.match(/[?&]autoskin=([cde])/);
+  if(!m) return;
+  setTimeout(function(){ try{ setSkin(m[1]); }catch(e){} }, 2200);
 })();
 
 /* 装成 App 之后，响铃的那行说明要换掉 —— 后台也响是这个版本的主要卖点。
@@ -1829,11 +1869,23 @@ if(location.search.indexOf("sheet=1") >= 0){
 })();
 """
 
+def _theme_buttons():
+    """设置面板里的三个配色按钮。色块直接用各套的主色，不交给皮肤替换。"""
+    swatch = {"c": "#0E3A63", "d": "#A8461C", "e": "#1B5FB0"}
+    out = []
+    for key, name, note in THEME_CHOICES:
+        out.append('<button class="th" data-sk="' + key + '" onclick="setSkin(\'' + key + '\')">'
+                   '<i style="background:' + swatch.get(key, "#0E3A63") + '"></i>'
+                   '<b>' + name + '</b><small>' + note + '</small></button>')
+    return "".join(out)
+
+
 REMIND_DOM = (
     '<div class="banner" id="banner"></div>'
     '<div class="mask" id="mask" onclick="closeSheet()"></div>'
     '<div class="sheet" id="sheet">'
-    '<h4>到站响铃</h4>'
+    '<h4>设置</h4>'
+    '<div class="sect-t">到站响铃</div>'
     '<div class="hint">车还有几站时，提示一次并响一声</div>'
     '<div class="opts">'
     '<button class="opt" data-n="2" onclick="pickAt(2)">2 站<small>推荐</small></button>'
@@ -1842,6 +1894,9 @@ REMIND_DOM = (
     '</div>'
     '<button class="off" onclick="turnOff()">关掉响铃</button>'
     '<div class="limit" id="limitline">现在只有页面开着才响。锁屏、切到别的应用就不响了</div>'
+    '<div class="sect-t">手机配色</div>'
+    '<div class="themes">' + _theme_buttons() + '</div>'
+    '<div class="thhint">点一下就换，换完自己记住</div>'
     '<div id="srvline"></div>'
     '</div>'
 )
@@ -1854,10 +1909,8 @@ def page_html(skin="a", pwa=False):
     """
     css = SKINS.get(skin) or SKINS.get("a") or CSS
     # 图标与状态栏底色跟着皮肤走，别让暖橘页面顶着深蓝图标
-    theme = {"b": "#E9EAE4", "d": "#FFF8F1", "e": "#F6FAFF",
-             "f": "#FFFAF3"}.get(skin, "#FAFAF7")
-    icon_v = {"c": "deep", "d": "warm", "e": "sky",
-              "f": "ember"}.get(skin, "ember")
+    theme = {"b": "#E9EAE4", "d": "#FFF8F1", "e": "#F6FAFF"}.get(skin, "#FAFAF7")
+    icon_v = {"c": "deep", "d": "warm", "e": "sky"}.get(skin, "warm")
     head = ""
     if pwa:
         head = ("<link rel=\"manifest\" href=\"/manifest.json\">"
@@ -1872,7 +1925,8 @@ def page_html(skin="a", pwa=False):
             "maximum-scale=1,user-scalable=no,viewport-fit=cover\">"
             "<meta name=\"theme-color\" content=\"" + theme + "\">" + head +
             "<title>公交到站</title><style>" + css + "</style></head>"
-            "<body><div id=\"app\" style=\"flex:1;display:flex;flex-direction:column;"
+            "<body data-sk=\"" + skin + "\">"
+            "<div id=\"app\" style=\"flex:1;display:flex;flex-direction:column;"
             "overflow:hidden;min-height:0\"></div>" + REMIND_DOM +
             "<script>" + JS.replace("__HOME_STATION__", HOME_STATION)
             .replace("__HOME_LINE__", HOME_LINE) + "</script></body></html>")
@@ -1905,6 +1959,15 @@ class Handler(BaseHTTPRequestHandler):
         self._send(200, json.dumps(obj, ensure_ascii=False),
                    "application/json; charset=utf-8")
 
+    def _cookie(self, name):
+        """取一个 cookie 的值，没有就返回空串。只用来记配色，不碰别的。"""
+        raw = self.headers.get("Cookie") or ""
+        for part in raw.split(";"):
+            k, _, v = part.strip().partition("=")
+            if k == name:
+                return v.strip()
+        return ""
+
     def do_GET(self):
         u = urllib.parse.urlparse(self.path)
         path = u.path
@@ -1912,9 +1975,14 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             if path in ("/", "/index.html"):
-                # 默认 c = 白卡 + V2 优化层；想对比旧版可以加 ?skin=a
-                skin = (q.get("skin") or ["c"])[0].lower()
-                self._send(200, page_html(skin, pwa=True), "text/html; charset=utf-8")
+                # 配色优先级：地址栏 ?skin= ＞ 上次在「设置」里选的（cookie）＞ 默认
+                # 用 cookie 而不是把 skin 写进网址：切完色刷新，hash 路由还在原地，
+                # 老人不会因为换个颜色就被弹回首页。
+                skin = (q.get("skin") or [""])[0].lower()
+                if skin not in SKINS:
+                    skin = self._cookie("sk") if self._cookie("sk") in SKINS else DEFAULT_SKIN
+                self._send(200, page_html(skin, pwa=True), "text/html; charset=utf-8",
+                           extra={"Vary": "Cookie"})
 
             elif path == "/api/home":
                 self._json(build_home())

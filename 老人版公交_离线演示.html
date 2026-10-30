@@ -317,7 +317,185 @@ body{
 .err{background:#FDF0EE;border:1px solid #F0C4BC;border-radius:16px;padding:20px;margin:16px 4px}
 .err h3{font-size:20px;color:#A33224;margin-bottom:8px}
 .err p{font-size:15.5px;color:#55595E;line-height:1.55}
-</style></head><body><div id="app" style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0"></div><div class="banner" id="banner"></div><div class="mask" id="mask" onclick="closeSheet()"></div><div class="sheet" id="sheet"><h4>到站响铃</h4><div class="hint">车还有几站时，提示一次并响一声</div><div class="opts"><button class="opt" data-n="2" onclick="pickAt(2)">2 站<small>推荐</small></button><button class="opt" data-n="3" onclick="pickAt(3)">3 站<small>早点出门</small></button><button class="opt" data-n="5" onclick="pickAt(5)">5 站<small>更早</small></button></div><button class="off" onclick="turnOff()">关掉响铃</button><div class="limit">现在只有页面开着才响。锁屏、切到别的应用就不响了</div></div><script>window.__DATA__={"/api/home": {"ok": true, "station": "石坦", "lines": [{"line": "36路", "dir": "1", "to": "浙南科技城首末站", "toShort": "浙南科技城", "node": "6站", "dist": "8分钟/2.6公里", "minutes": 8, "meters": 2600, "stations": 6, "status": "coming", "order": 29}, {"line": "36路", "dir": "2", "to": "九山首末站", "toShort": "九山", "node": "7站", "dist": "11分钟/4.2公里", "minutes": 11, "meters": 4200, "stations": 7, "status": "coming", "order": 15}], "updated": "16:07", "isHome": true}, "/api/station?name=%E7%9F%B3%E5%9D%A6": {"ok": true, "station": "石坦", "lines": [{"line": "36路", "dir": "1", "to": "浙南科技城首末站", "toShort": "浙南科技城", "node": "6站", "dist": "8分钟/2.6公里", "minutes": 8, "meters": 2600, "stations": 6, "status": "coming", "order": 29}, {"line": "36路", "dir": "2", "to": "九山首末站", "toShort": "九山", "node": "7站", "dist": "11分钟/4.2公里", "minutes": 11, "meters": 4200, "stations": 7, "status": "coming", "order": 15}], "updated": "16:07"}, "/api/station?name=%E6%96%B0%E5%9F%8E%E7%AB%99": {"ok": true, "station": "新城站", "lines": [{"line": "17路", "dir": "2", "to": "会展中心首末站(工商银行)", "toShort": "会展中心", "node": "即将到站", "dist": "小于1分钟/320米", "minutes": 0, "meters": 320, "stations": null, "status": "coming", "order": 36}, {"line": "B103路", "dir": "2", "to": "双屿公交枢纽", "toShort": "双屿", "node": "即将到站", "dist": "小于1分钟/270米", "minutes": 0, "meters": 270, "stations": null, "status": "coming", "order": 13}, {"line": "B103路", "dir": "1", "to": "状元公交枢纽", "toShort": "状元", "node": "即将到站", "dist": "2分钟/570米", "minutes": 2, "meters": 570, "stations": null, "status": "coming", "order": 23}, {"line": "55路", "dir": "1", "to": "高新科技园首末站", "toShort": "高新科技园", "node": "即将到站", "dist": "2分钟/810米", "minutes": 2, "meters": 810, "stations": null, "status": "coming", "order": 29}, {"line": "98路", "dir": "1", "to": "潘岙首末站", "toShort": "潘岙", "node": "2站", "dist": "3分钟/1.2公里", "minutes": 3, "meters": 1200, "stations": 2, "status": "coming", "order": 10}, {"line": "68路", "dir": "1", "to": "三桥下首末站(不用于上下客)", "toShort": "三桥下", "node": "2站", "dist": "4分钟/1.3公里", "minutes": 4, "meters": 1300, "stations": 2, "status": "coming", "order": 7}, {"line": "165路", "dir": "2", "to": "状元公交枢纽", "toShort": "状元", "node": "2站", "dist": "4分钟/1.3公里", "minutes": 4, "meters": 1300, "stations": 2, "status": "coming", "order": 17}, {"line": "B5路", "dir": "1", "to": "S1奥体中心首末站", "toShort": "S1奥体中心", "node": "3站", "dist": "4分钟/1.6公里", "minutes": 4, "meters": 1600, "stations": 3, "status": "coming", "order": 25}, {"line": "36路", "dir": "2", "to": "九山首末站", "toShort": "九山", "node": "3站", "dist": "5分钟/1.9公里", "minutes": 5, "meters": 1900, "stations": 3, "status": "coming", "order": 28}, {"line": "63路", "dir": "1", "to": "瓯海中心区首末站", "toShort": "瓯海中心区", "node": "4站", "dist": "5分钟/1.7公里", "minutes": 5, "meters": 1700, "stations": 4, "status": "coming", "order": 22}, {"line": "92路", "dir": "1", "to": "牛山公园首末站", "toShort": "牛山公园", "node": "3站", "dist": "6分钟/2.1公里", "minutes": 6, "meters": 2100, "stations": 3, "status": "coming", "order": 6}, {"line": "B112路", "dir": "1", "to": "高新科技园首末站", "toShort": "高新科技园", "node": "4站", "dist": "6分钟/2公里", "minutes": 6, "meters": 2000, "stations": 4, "status": "coming", "order": 27}, {"line": "26路", "dir": "1", "to": "黄龙首末站", "toShort": "黄龙", "node": "2站", "dist": "6分钟/1.1公里", "minutes": 6, "meters": 1100, "stations": 2, "status": "coming", "order": 7}, {"line": "98路", "dir": "2", "to": "城东公交首末站", "toShort": "城东公交", "node": "4站", "dist": "6分钟/2.1公里", "minutes": 6, "meters": 2100, "stations": 4, "status": "coming", "order": 44}, {"line": "68路", "dir": "2", "to": "会展中心首末站(工商银行)", "toShort": "会展中心", "node": "4站", "dist": "7分钟/2.3公里", "minutes": 7, "meters": 2300, "stations": 4, "status": "coming", "order": 26}, {"line": "71路", "dir": "2", "to": "陡门头首末站", "toShort": "陡门头", "node": "5站", "dist": "8分钟/2.6公里", "minutes": 8, "meters": 2600, "stations": 5, "status": "coming", "order": 53}, {"line": "92路", "dir": "2", "to": "城东公交首末站", "toShort": "城东公交", "node": "5站", "dist": "8分钟/2.8公里", "minutes": 8, "meters": 2800, "stations": 5, "status": "coming", "order": 40}, {"line": "B112路", "dir": "2", "to": "汇昌河首末站", "toShort": "汇昌河", "node": "6站", "dist": "9分钟/3公里", "minutes": 9, "meters": 3000, "stations": 6, "status": "coming", "order": 15}, {"line": "26路", "dir": "2", "to": "蒲中路首末站", "toShort": "蒲中路", "node": "5站", "dist": "9分钟/2.9公里", "minutes": 9, "meters": 2900, "stations": 5, "status": "coming", "order": 26}, {"line": "100路", "dir": "1", "to": "西台首末站", "toShort": "西台", "node": "6站", "dist": "10分钟/3.3公里", "minutes": 10, "meters": 3300, "stations": 6, "status": "coming", "order": 18}, {"line": "B107路", "dir": "1", "to": "新城客运站首末站", "toShort": "新城客运站", "node": "7站", "dist": "10分钟/3.3公里", "minutes": 10, "meters": 3300, "stations": 7, "status": "coming", "order": 26}, {"line": "55路", "dir": "2", "to": "康强家园", "toShort": "康强家园", "node": "5站", "dist": "10分钟/3.2公里", "minutes": 10, "meters": 3200, "stations": 5, "status": "coming", "order": 16}, {"line": "54路", "dir": "2", "to": "洪殿", "toShort": "洪殿", "node": "7站", "dist": "10分钟/3.4公里", "minutes": 10, "meters": 3400, "stations": 7, "status": "coming", "order": 37}, {"line": "49路", "dir": "2", "to": "飞霞桥首末站", "toShort": "飞霞桥", "node": "7站", "dist": "12分钟/3.4公里", "minutes": 12, "meters": 3400, "stations": 7, "status": "coming", "order": 33}, {"line": "165路", "dir": "1", "to": "温州北站公交枢纽", "toShort": "温州北站", "node": "8站", "dist": "13分钟/4.6公里", "minutes": 13, "meters": 4600, "stations": 8, "status": "coming", "order": 13}, {"line": "150路", "dir": "2", "to": "新城客运站首末站", "toShort": "新城客运站", "node": "4站", "dist": "13分钟/4.3公里", "minutes": 13, "meters": 4300, "stations": 4, "status": "coming", "order": 32}, {"line": "B5路", "dir": "2", "to": "火车南站公交枢纽", "toShort": "火车南站", "node": "7站", "dist": "14分钟/4.9公里", "minutes": 14, "meters": 4900, "stations": 7, "status": "coming", "order": 23}, {"line": "100路", "dir": "2", "to": "附一医南白象院区公交客运枢纽", "toShort": "附一医南白象院区公交客运枢纽", "node": "6站", "dist": "15分钟/4.1公里", "minutes": 15, "meters": 4100, "stations": 6, "status": "coming", "order": 16}, {"line": "9路", "dir": "1", "to": "永中车站首末站", "toShort": "永中车站", "node": "8站", "dist": "15分钟/4.4公里", "minutes": 15, "meters": 4400, "stations": 8, "status": "coming", "order": 12}, {"line": "B702路", "dir": "2", "to": "S1三垟湿地首末站", "toShort": "S1三垟湿地", "node": "已到站", "dist": "", "minutes": null, "meters": null, "stations": null, "status": "here", "order": 28}], "updated": "16:07"}, "/api/line?name=36%E8%B7%AF&dir=1&focus=%E7%9F%B3%E5%9D%A6": {"ok": true, "line": "36路", "dir": "1", "from": "九山首末站", "to": "浙南科技城首末站", "fromShort": "九山", "toShort": "浙南科技城", "begin": "05:50", "end": "19:00", "stops": [{"i": 1, "name": "九山首末站", "lat": 28.01829559, "lon": 120.64119233}, {"i": 2, "name": "粗糠桥", "lat": 28.01582469, "lon": 120.64022344}, {"i": 3, "name": "奥林匹克广场", "lat": 28.01131146, "lon": 120.64250018}, {"i": 4, "name": "西站(美美时尚广场)", "lat": 28.00967726, "lon": 120.64456795}, {"i": 5, "name": "清明桥", "lat": 28.00641304, "lon": 120.64706269}, {"i": 6, "name": "杏花路", "lat": 28.00366291, "lon": 120.64853254}, {"i": 7, "name": "水心小学二校区", "lat": 27.99924178, "lon": 120.6501284}, {"i": 8, "name": "市政大桥", "lat": 27.99780344, "lon": 120.65523697}, {"i": 9, "name": "银都花苑", "lat": 27.99832415, "lon": 120.66048862}, {"i": 10, "name": "白鹿洲公园", "lat": 27.99906491, "lon": 120.66773431}, {"i": 11, "name": "茶院寺", "lat": 27.99935984, "lon": 120.6721142}, {"i": 12, "name": "市体育中心南", "lat": 27.99945485, "lon": 120.67829117}, {"i": 13, "name": "时代广场", "lat": 27.999499, "lon": 120.6853753}, {"i": 14, "name": "横渎", "lat": 27.9995352, "lon": 120.6902435}, {"i": 15, "name": "市中西医结合医院", "lat": 27.99951937, "lon": 120.69361067}, {"i": 16, "name": "伯爵山庄", "lat": 27.99929578, "lon": 120.69973909}, {"i": 17, "name": "新城站", "lat": 27.99815841, "lon": 120.70729078}, {"i": 18, "name": "温州广播电视中心", "lat": 27.99490099, "lon": 120.7129364}, {"i": 19, "name": "计量大楼", "lat": 27.99193501, "lon": 120.71319043}, {"i": 20, "name": "雁湖社区", "lat": 27.98747919, "lon": 120.71480662}, {"i": 21, "name": "鸿基花苑", "lat": 27.98608754, "lon": 120.71786301}, {"i": 22, "name": "雁荡中路文昌路", "lat": 27.98224027, "lon": 120.7310649}, {"i": 23, "name": "诚鸿花苑", "lat": 27.979944, "lon": 120.73611469}, {"i": 24, "name": "慎江路", "lat": 27.97699894, "lon": 120.74236672}, {"i": 25, "name": "龙湾时尚邻里", "lat": 27.97466149, "lon": 120.74592832}, {"i": 26, "name": "雁荡东路钱江路", "lat": 27.97227306, "lon": 120.74956093}, {"i": 27, "name": "四明山路", "lat": 27.96940278, "lon": 120.74783064}, {"i": 28, "name": "温州东瓯中学", "lat": 27.96676356, "lon": 120.7463774}, {"i": 29, "name": "石坦", "lat": 27.96453167, "lon": 120.74713452}, {"i": 30, "name": "岩岙", "lat": 27.96283734, "lon": 120.75144526}, {"i": 31, "name": "兴元路", "lat": 27.96344375, "lon": 120.7540337}, {"i": 32, "name": "状元二期工业区", "lat": 27.96286515, "lon": 120.75664914}, {"i": 33, "name": "周宅", "lat": 27.96295968, "lon": 120.76005472}, {"i": 34, "name": "温州大道龙腾南路", "lat": 27.96429185, "lon": 120.76118191}, {"i": 35, "name": "温州大道富强路", "lat": 27.9625406, "lon": 120.76618974}, {"i": 36, "name": "S1科技城", "lat": 27.95510609, "lon": 120.78429046}, {"i": 37, "name": "附二医龙湾院区北", "lat": 27.94889466, "lon": 120.79909917}, {"i": 38, "name": "得利桥", "lat": 27.94709581, "lon": 120.80095434}, {"i": 39, "name": "附二医龙湾院区南", "lat": 27.9459285, "lon": 120.79736799}, {"i": 40, "name": "浙南科技城首末站", "lat": 27.94733716, "lon": 120.79391464}], "buses": [{"index": 6, "plate": "1005266", "toNext": 114}, {"index": 22, "plate": "1005259", "toNext": 0}], "hasReal": true, "focus": 29, "updated": "16:07"}, "/api/board?line=36%E8%B7%AF&dir=1&station=%E7%9F%B3%E5%9D%A6": {"ok": true, "station": "石坦", "line": "36路", "dir": "1", "main": {"line": "36路", "dir": "1", "to": "浙南科技城首末站", "toShort": "浙南科技城", "node": "6站", "dist": "8分钟/2.6公里", "minutes": 8, "meters": 2600, "stations": 6, "status": "coming", "order": 29}, "other": {"line": "36路", "dir": "2", "to": "九山首末站", "toShort": "九山", "node": "7站", "dist": "11分钟/4.2公里", "minutes": 11, "meters": 4200, "stations": 7, "status": "coming", "order": 15}, "win": {"rows": [{"i": 1, "name": "九山首末站", "mine": false, "bus": false}, {"i": 2, "name": "粗糠桥", "mine": false, "bus": false}, {"i": 3, "name": "奥林匹克广场", "mine": false, "bus": false}, {"i": 4, "name": "西站(美美时尚广场)", "mine": false, "bus": false}, {"i": 5, "name": "清明桥", "mine": false, "bus": false}, {"i": 6, "name": "杏花路", "mine": false, "bus": true}, {"i": 7, "name": "水心小学二校区", "mine": false, "bus": false}, {"i": 8, "name": "市政大桥", "mine": false, "bus": false}, {"i": 9, "name": "银都花苑", "mine": false, "bus": false}, {"i": 10, "name": "白鹿洲公园", "mine": false, "bus": false}, {"i": 11, "name": "茶院寺", "mine": false, "bus": false}, {"i": 12, "name": "市体育中心南", "mine": false, "bus": false}, {"i": 13, "name": "时代广场", "mine": false, "bus": false}, {"i": 14, "name": "横渎", "mine": false, "bus": false}, {"i": 15, "name": "市中西医结合医院", "mine": false, "bus": false}, {"i": 16, "name": "伯爵山庄", "mine": false, "bus": false}, {"i": 17, "name": "新城站", "mine": false, "bus": false}, {"i": 18, "name": "温州广播电视中心", "mine": false, "bus": false}, {"i": 19, "name": "计量大楼", "mine": false, "bus": false}, {"i": 20, "name": "雁湖社区", "mine": false, "bus": false}, {"i": 21, "name": "鸿基花苑", "mine": false, "bus": false}, {"i": 22, "name": "雁荡中路文昌路", "mine": false, "bus": true}, {"i": 23, "name": "诚鸿花苑", "mine": false, "bus": false}, {"i": 24, "name": "慎江路", "mine": false, "bus": false}, {"i": 25, "name": "龙湾时尚邻里", "mine": false, "bus": false}, {"i": 26, "name": "雁荡东路钱江路", "mine": false, "bus": false}, {"i": 27, "name": "四明山路", "mine": false, "bus": false}, {"i": 28, "name": "温州东瓯中学", "mine": false, "bus": false}, {"i": 29, "name": "石坦", "mine": true, "bus": false}, {"i": 30, "name": "岩岙", "mine": false, "bus": false}, {"i": 31, "name": "兴元路", "mine": false, "bus": false}, {"i": 32, "name": "状元二期工业区", "mine": false, "bus": false}, {"i": 33, "name": "周宅", "mine": false, "bus": false}, {"i": 34, "name": "温州大道龙腾南路", "mine": false, "bus": false}, {"i": 35, "name": "温州大道富强路", "mine": false, "bus": false}, {"i": 36, "name": "S1科技城", "mine": false, "bus": false}, {"i": 37, "name": "附二医龙湾院区北", "mine": false, "bus": false}, {"i": 38, "name": "得利桥", "mine": false, "bus": false}, {"i": 39, "name": "附二医龙湾院区南", "mine": false, "bus": false}, {"i": 40, "name": "浙南科技城首末站", "mine": false, "bus": false}], "busHere": "雁荡中路文昌路", "total": 40, "focus": 29}, "passes": true, "total": 40, "hasReal": true, "updated": "16:07"}, "/api/line?name=36%E8%B7%AF&dir=2&focus=%E7%9F%B3%E5%9D%A6": {"ok": true, "line": "36路", "dir": "2", "from": "浙南科技城首末站", "to": "九山首末站", "fromShort": "浙南科技城", "toShort": "九山", "begin": "05:50", "end": "19:00", "stops": [{"i": 1, "name": "浙南科技城首末站", "lat": 27.94702515, "lon": 120.79373661}, {"i": 2, "name": "东悦里西", "lat": 27.94832372, "lon": 120.78971015}, {"i": 3, "name": "东悦里北", "lat": 27.94917185, "lon": 120.7909393}, {"i": 4, "name": "附二医龙湾院区南", "lat": 27.94622251, "lon": 120.79744001}, {"i": 5, "name": "温医大口腔医院", "lat": 27.9443235, "lon": 120.797393}, {"i": 6, "name": "宏周桥", "lat": 27.94531273, "lon": 120.79998924}, {"i": 7, "name": "附二医龙湾院区北", "lat": 27.94952255, "lon": 120.79792505}, {"i": 8, "name": "S1科技城", "lat": 27.95509912, "lon": 120.78455949}, {"i": 9, "name": "温州大道龙永路", "lat": 27.95667472, "lon": 120.78134705}, {"i": 10, "name": "温州大道富强路", "lat": 27.96301644, "lon": 120.76507856}, {"i": 11, "name": "周宅", "lat": 27.96292965, "lon": 120.75988068}, {"i": 12, "name": "状元二期工业区", "lat": 27.96304405, "lon": 120.75596903}, {"i": 13, "name": "兴元路", "lat": 27.96356968, "lon": 120.75360662}, {"i": 14, "name": "岩岙", "lat": 27.96301341, "lon": 120.75188633}, {"i": 15, "name": "石坦", "lat": 27.96443874, "lon": 120.7475916}, {"i": 16, "name": "温州东瓯中学", "lat": 27.96680056, "lon": 120.7464184}, {"i": 17, "name": "四明山路", "lat": 27.9695558, "lon": 120.74794066}, {"i": 18, "name": "雁荡东路钱江路", "lat": 27.97237603, "lon": 120.74942691}, {"i": 19, "name": "龙湾时尚邻里", "lat": 27.97444054, "lon": 120.74630238}, {"i": 20, "name": "慎江路", "lat": 27.97705193, "lon": 120.7422927}, {"i": 21, "name": "诚鸿花苑", "lat": 27.98011897, "lon": 120.73582064}, {"i": 22, "name": "雁荡中路文昌路", "lat": 27.98191446, "lon": 120.73236109}, {"i": 23, "name": "雁荡西路鳌江路", "lat": 27.98343549, "lon": 120.72536803}, {"i": 24, "name": "鸿基花苑", "lat": 27.98514281, "lon": 120.7200863}, {"i": 25, "name": "雁湖社区", "lat": 27.98724127, "lon": 120.7154767}, {"i": 26, "name": "计量大楼", "lat": 27.99085597, "lon": 120.71282239}, {"i": 27, "name": "温州广播电视中心", "lat": 27.99553696, "lon": 120.71268137}, {"i": 28, "name": "新城站", "lat": 27.99836437, "lon": 120.70683974}, {"i": 29, "name": "伯爵山庄", "lat": 27.99944773, "lon": 120.69914805}, {"i": 30, "name": "市中西医结合医院", "lat": 27.99959544, "lon": 120.69490575}, {"i": 31, "name": "横渎", "lat": 27.99967128, "lon": 120.69195359}, {"i": 32, "name": "交运石油", "lat": 27.99963507, "lon": 120.68752238}, {"i": 33, "name": "时代广场", "lat": 27.9995999, "lon": 120.68184522}, {"i": 34, "name": "茶院寺", "lat": 27.99963284, "lon": 120.6723692}, {"i": 35, "name": "白鹿洲公园", "lat": 27.99879903, "lon": 120.66389045}, {"i": 36, "name": "银都花苑", "lat": 27.99858211, "lon": 120.66172456}, {"i": 37, "name": "市政大桥", "lat": 27.99798741, "lon": 120.65576193}, {"i": 38, "name": "水心竹组团", "lat": 27.99746565, "lon": 120.65190424}, {"i": 39, "name": "水心小学二校区", "lat": 28.0000508, "lon": 120.64990441}, {"i": 40, "name": "杏花路", "lat": 28.00268487, "lon": 120.64907949}, {"i": 41, "name": "清明桥", "lat": 28.00647004, "lon": 120.64714267}, {"i": 42, "name": "西站(美美时尚广场)", "lat": 28.00939022, "lon": 120.64508489}, {"i": 43, "name": "奥林匹克广场", "lat": 28.01144846, "lon": 120.64250817}, {"i": 44, "name": "粗糠桥", "lat": 28.01515167, "lon": 120.64037543}, {"i": 45, "name": "九山首末站", "lat": 28.01829559, "lon": 120.64119233}], "buses": [{"index": 7, "plate": "1005252", "toNext": 0}, {"index": 25, "plate": "1005277", "toNext": 579}, {"index": 40, "plate": "1005267", "toNext": 0}], "hasReal": true, "focus": 15, "updated": "16:07"}, "/api/board?line=36%E8%B7%AF&dir=2&station=%E7%9F%B3%E5%9D%A6": {"ok": true, "station": "石坦", "line": "36路", "dir": "2", "main": {"line": "36路", "dir": "2", "to": "九山首末站", "toShort": "九山", "node": "7站", "dist": "11分钟/4.2公里", "minutes": 11, "meters": 4200, "stations": 7, "status": "coming", "order": 15}, "other": {"line": "36路", "dir": "1", "to": "浙南科技城首末站", "toShort": "浙南科技城", "node": "6站", "dist": "8分钟/2.6公里", "minutes": 8, "meters": 2600, "stations": 6, "status": "coming", "order": 29}, "win": {"rows": [{"i": 1, "name": "浙南科技城首末站", "mine": false, "bus": false}, {"i": 2, "name": "东悦里西", "mine": false, "bus": false}, {"i": 3, "name": "东悦里北", "mine": false, "bus": false}, {"i": 4, "name": "附二医龙湾院区南", "mine": false, "bus": false}, {"i": 5, "name": "温医大口腔医院", "mine": false, "bus": false}, {"i": 6, "name": "宏周桥", "mine": false, "bus": false}, {"i": 7, "name": "附二医龙湾院区北", "mine": false, "bus": true}, {"i": 8, "name": "S1科技城", "mine": false, "bus": false}, {"i": 9, "name": "温州大道龙永路", "mine": false, "bus": false}, {"i": 10, "name": "温州大道富强路", "mine": false, "bus": false}, {"i": 11, "name": "周宅", "mine": false, "bus": false}, {"i": 12, "name": "状元二期工业区", "mine": false, "bus": false}, {"i": 13, "name": "兴元路", "mine": false, "bus": false}, {"i": 14, "name": "岩岙", "mine": false, "bus": false}, {"i": 15, "name": "石坦", "mine": true, "bus": false}, {"i": 16, "name": "温州东瓯中学", "mine": false, "bus": false}, {"i": 17, "name": "四明山路", "mine": false, "bus": false}, {"i": 18, "name": "雁荡东路钱江路", "mine": false, "bus": false}, {"i": 19, "name": "龙湾时尚邻里", "mine": false, "bus": false}, {"i": 20, "name": "慎江路", "mine": false, "bus": false}, {"i": 21, "name": "诚鸿花苑", "mine": false, "bus": false}, {"i": 22, "name": "雁荡中路文昌路", "mine": false, "bus": false}, {"i": 23, "name": "雁荡西路鳌江路", "mine": false, "bus": false}, {"i": 24, "name": "鸿基花苑", "mine": false, "bus": false}, {"i": 25, "name": "雁湖社区", "mine": false, "bus": false}, {"i": 26, "name": "计量大楼", "mine": false, "bus": false}, {"i": 27, "name": "温州广播电视中心", "mine": false, "bus": false}, {"i": 28, "name": "新城站", "mine": false, "bus": false}, {"i": 29, "name": "伯爵山庄", "mine": false, "bus": false}, {"i": 30, "name": "市中西医结合医院", "mine": false, "bus": false}, {"i": 31, "name": "横渎", "mine": false, "bus": false}, {"i": 32, "name": "交运石油", "mine": false, "bus": false}, {"i": 33, "name": "时代广场", "mine": false, "bus": false}, {"i": 34, "name": "茶院寺", "mine": false, "bus": false}, {"i": 35, "name": "白鹿洲公园", "mine": false, "bus": false}, {"i": 36, "name": "银都花苑", "mine": false, "bus": false}, {"i": 37, "name": "市政大桥", "mine": false, "bus": false}, {"i": 38, "name": "水心竹组团", "mine": false, "bus": false}, {"i": 39, "name": "水心小学二校区", "mine": false, "bus": false}, {"i": 40, "name": "杏花路", "mine": false, "bus": false}, {"i": 41, "name": "清明桥", "mine": false, "bus": false}, {"i": 42, "name": "西站(美美时尚广场)", "mine": false, "bus": false}, {"i": 43, "name": "奥林匹克广场", "mine": false, "bus": false}, {"i": 44, "name": "粗糠桥", "mine": false, "bus": false}, {"i": 45, "name": "九山首末站", "mine": false, "bus": false}], "busHere": "附二医龙湾院区北", "total": 45, "focus": 15}, "passes": true, "total": 45, "hasReal": true, "updated": "16:07"}, "/api/search?kw=159": {"ok": true, "kw": "159", "lines": [{"line": "159路", "from": "状元", "to": "浙江东方学院", "hasReal": true, "dirs": [{"dir": "1", "toShort": "浙江东方学院", "stopCount": 33}, {"dir": "2", "toShort": "状元", "stopCount": 33}]}], "stations": [], "linesTotal": 1, "stationsTotal": 0, "skipped": 0}, "/api/search?kw=36": {"ok": true, "kw": "36", "lines": [{"line": "36路", "from": "九山", "to": "浙南科技城", "hasReal": true, "dirs": [{"dir": "1", "toShort": "浙南科技城", "stopCount": 40}, {"dir": "2", "toShort": "九山", "stopCount": 45}]}, {"line": "苍南JD36路", "from": "金乡车站", "to": "南行街", "hasReal": true}, {"line": "苍南QW36路", "from": "钱库车站", "to": "钱库车站", "hasReal": true}], "stations": [], "linesTotal": 3, "stationsTotal": 0, "skipped": 0}, "/api/search?kw=S1": {"ok": true, "kw": "S1", "lines": [{"line": "微公交S1龙霞线", "from": "S1龙霞", "to": "S1龙霞", "hasReal": true}], "stations": [{"name": "S1新桥"}, {"name": "S1桐岭"}, {"name": "S1潘桥"}, {"name": "S1瑶溪"}, {"name": "S1惠民路"}, {"name": "S1瓯江口"}, {"name": "S1科技城"}, {"name": "S1龙腾路"}], "linesTotal": 1, "stationsTotal": 22, "skipped": 1}, "/api/search?kw=%E7%9F%B3%E5%9D%A6": {"ok": true, "kw": "石坦", "lines": [], "stations": [{"name": "石坦"}, {"name": "石坦路"}, {"name": "石坦农贸市场"}], "linesTotal": 0, "stationsTotal": 3, "skipped": 0}};</script><script>
+
+/* ==================================================================
+   V2 覆盖层：只写与 V1 的差异，便于逐条对照
+   维度：布局结构 / 视觉层级 / 交互流程 / 一致性 / 响应式 / 无障碍
+   ================================================================== */
+
+/* ---- 响应式：字号跟随屏宽，360 小屏不再挤 ---- */
+.min{font-size:clamp(66px,25vw,96px);letter-spacing:-.055em;line-height:.84}
+.unit{font-size:clamp(16px,4.6vw,22px);padding-bottom:.10em}
+.stxt{font-size:clamp(34px,12.5vw,48px)}
+.lineno{font-size:clamp(23px,6vw,27px)}
+
+/* ---- 布局：卡片分区更清楚 ---- */
+.scroll.home{padding:0 14px 12px}
+.card{border-radius:24px;padding:22px 20px 16px}
+
+/* ---- 视觉层级：数字区重排，「还有 X 站」进入同一信息组 ---- */
+.sub{
+  font-size:16px;color:#5C6157;margin-top:12px;
+  display:flex;align-items:center;gap:7px;flex-wrap:wrap;
+}
+.sub b{font-weight:700;color:#1A1C1E}
+.go{margin-right:2px}
+
+/* ---- 视觉层级：车位置提示降噪，改成列表的上下文而不是公告 ---- */
+.swabove{
+  display:flex;align-items:center;gap:7px;
+  font-size:13.5px;color:#85897E;padding:0 0 9px;line-height:1.4;
+}
+.swabove::before{
+  content:"";width:5px;height:5px;border-radius:50%;
+  background:#C7CCBE;flex-shrink:0;
+}
+
+/* ---- 点站点看车多久到：选中行 + 顶部就地变成估算条 ---- */
+.swrow{cursor:pointer}
+.swrow[data-sel="1"]{background:#E8F0F7;border-radius:9px}
+.swrow[data-sel="1"] .n{color:#0B4F8A;font-weight:700}
+.swrow[data-sel="1"] .d{border-color:#0B4F8A}
+.swabove.hot{
+  display:flex;align-items:center;gap:7px;flex-wrap:wrap;
+  background:#0E3A63;color:#fff;border-radius:11px;
+  padding:9px 11px;margin:0 0 9px;font-size:14px;line-height:1.35;
+}
+.swabove.hot::before{display:none}
+.swabove.hot .to{
+  flex:1;min-width:0;font-weight:700;font-size:14.5px;color:#fff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.swabove.hot .t{font-size:16px;font-weight:700;color:#fff;flex-shrink:0}
+.swabove.hot .x{color:rgba(255,255,255,.74);font-size:12.5px;flex-shrink:0}
+.swabove.hot .bx{
+  margin-left:auto;width:26px;height:26px;flex-shrink:0;padding:0;
+  background:rgba(255,255,255,.18);border:0;border-radius:50%;
+  color:#fff;font-size:16px;line-height:1;
+}
+
+/* ---- 交互：换方向更像按钮，不再像标签 ---- */
+.swapbtn{
+  border-color:#D5DAE1;color:#2F353C;
+  box-shadow:0 1px 2px rgba(22,32,43,.06);
+  padding:9px 13px;
+}
+.swapbtn:active{background:#F2F4F7}
+
+/* ---- 交互 + 无障碍：响铃入口有足够触控高度和对比度 ---- */
+.remlink{
+  min-height:48px;padding:0;display:inline-flex;align-items:center;gap:5px;
+  font-size:15px;font-weight:600;color:#0E3A63;
+}
+.remlink.on{color:#A8480B;font-weight:700}
+
+/* ---- 一致性：三页导航同一套尺寸 ---- */
+.nav{padding:18px 20px 12px;min-height:56px}
+.back{padding:12px 12px 12px 0;margin:-12px 0}
+
+/* ---- 站牌页：三列栅格，线路号/方向/时间严格对齐 ---- */
+.row{
+  display:grid;
+  grid-template-columns:104px minmax(0,1fr) auto;
+  align-items:center;column-gap:12px;
+  padding:17px 2px;
+}
+.row .ln{min-width:0;font-size:20px;letter-spacing:-.3px}
+.row .dst{min-width:0;font-size:15px;color:#6B7165}
+.row .tm{min-width:54px;font-size:25px}
+.row .arrow{display:none}
+.srow{grid-template-columns:minmax(0,auto) minmax(0,1fr) auto}
+.srow .ln{font-size:19px}
+
+/* ---- 站牌页：底部两块间距收紧 ---- */
+.more{padding:19px 2px;font-size:15.5px}
+.tip{font-size:12.5px;color:#7A7F74;padding:8px 0 2px}
+
+/* ---- 详情页：顶部信息与列表分开 ---- */
+.lhead{padding:2px 20px 15px;border-bottom:1px solid #EFEEE7}
+.lh2{font-size:19px;font-weight:500;color:#4A4F45}
+.lh2 b{font-size:21px;font-weight:700;color:#0E3A63}
+.lh3{font-size:12.5px;color:#7A7F74}
+.swap{border-color:#D5DAE1;box-shadow:0 1px 2px rgba(22,32,43,.06)}
+
+/* ---- 详情页：时间轴加深一档，长列表不糊 ---- */
+.tl{padding:14px 0 32px}
+.stop .rail{background:#D5D4C9}
+.stop{height:58px}
+.sname{font-size:19.5px}
+.tagme{background:#E3EDF9;color:#0E3A63}
+
+/* ---- 无障碍：灰字统一提到 4.5:1 以上 ---- */
+.sec{color:#7A7F74}
+.nav .r{color:#6E7368}
+.tip{color:#7A7F74}
+.cfoot{padding-top:12px}
+
+/* ---- 无障碍：键盘/读屏可见 ---- */
+:focus-visible{outline:2.5px solid #0E3A63;outline-offset:2px;border-radius:8px}
+.btn:focus-visible{outline-offset:3px}
+
+/* ---- 无障碍：尊重系统的「减少动态效果」 ---- */
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}
+
+/* ---- 响应式：窄屏收一档，别把方向名截断成「浙南科…」 ---- */
+@media (max-width:374px){
+  .toward{font-size:13.5px}
+  .swapbtn{font-size:11.5px;padding:8px 10px;gap:4px}
+  .swapbtn b{font-size:13.5px}
+}
+
+/* ---- 响应式：极窄屏（320-359）再收一档 ---- */
+@media (max-width:359px){
+  .nav .t{font-size:21px}
+  .row{grid-template-columns:92px minmax(0,1fr) auto}
+  .row .ln{font-size:18px}
+  .btn{font-size:16px;height:58px}
+}
+
+/* ---- 矮屏（老机型、或者浏览器地址栏占掉一大块）：把竖向空间抢回来给站点列表。
+        不这么收的话，360×640 上列表只剩三行，等于没有。 ---- */
+@media (max-height:700px){
+  .min{font-size:clamp(52px,20vw,70px);letter-spacing:-3px}
+  .cmid{margin-top:8px}
+  .sub{margin-top:5px}
+  .swin{margin-top:10px;padding-top:4px}
+  .swabove{padding:1px 0 0}
+  .swrow{height:40px}
+  .cfoot{padding-top:8px}
+  .btnrow{padding-top:8px;padding-bottom:8px}
+  .btn{height:58px}
+}
+
+/* ---------------------------------------------------------- 设置面板：配色 */
+/* 面板现在有响铃和配色两段，小屏（640 高）会顶到屏幕外，给它自己能滚 */
+.sheet{max-height:90vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+       scrollbar-width:none}
+.sheet::-webkit-scrollbar{display:none}
+.sheet .sect-t{
+  font-size:13.5px;font-weight:600;color:#96998F;letter-spacing:.2px;
+  margin:20px 2px 8px;padding-top:14px;border-top:1px solid #EFEEE7;
+}
+.sheet .sect-t:first-of-type{margin-top:18px;padding-top:0;border-top:0}
+.themes{display:flex;gap:9px;margin-top:4px}
+.th{
+  flex:1;height:78px;border:1.5px solid #E2E1D9;border-radius:15px;background:#fff;
+  font-family:inherit;cursor:pointer;padding:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+}
+.th i{width:22px;height:22px;border-radius:7px;display:block}
+.th b{font-size:15px;font-weight:600;color:#2A2E33}
+.th small{font-size:11.5px;font-weight:500;color:#8A8F94}
+.th.sel{border-color:#0E3A63;background:#F4F8FC;box-shadow:inset 0 0 0 1px #0E3A63}
+.th.sel b{color:#0E3A63}
+.thhint{font-size:12.5px;color:#96998F;margin-top:10px;text-align:center}
+.nav .setlink{
+  font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;
+  color:#6B7076;background:#F2F1EA;border:none;border-radius:9px;padding:5px 11px;
+}
+</style></head><body data-sk="c"><div id="app" style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0"></div><div class="banner" id="banner"></div><div class="mask" id="mask" onclick="closeSheet()"></div><div class="sheet" id="sheet"><h4>设置</h4><div class="sect-t">到站响铃</div><div class="hint">车还有几站时，提示一次并响一声</div><div class="opts"><button class="opt" data-n="2" onclick="pickAt(2)">2 站<small>推荐</small></button><button class="opt" data-n="3" onclick="pickAt(3)">3 站<small>早点出门</small></button><button class="opt" data-n="5" onclick="pickAt(5)">5 站<small>更早</small></button></div><button class="off" onclick="turnOff()">关掉响铃</button><div class="limit" id="limitline">现在只有页面开着才响。锁屏、切到别的应用就不响了</div><div class="sect-t">手机配色</div><div class="themes"><button class="th" data-sk="c" onclick="setSkin('c')"><i style="background:#0E3A63"></i><b>深蓝</b><small>跟原来一样</small></button><button class="th" data-sk="d" onclick="setSkin('d')"><i style="background:#A8461C"></i><b>暖橘</b><small>看着暖和</small></button><button class="th" data-sk="e" onclick="setSkin('e')"><i style="background:#1B5FB0"></i><b>晴空</b><small>清爽明亮</small></button></div><div class="thhint">点一下就换，换完自己记住</div><div id="srvline"></div></div><script>window.__DATA__={"/api/home": {"ok": true, "station": "石坦", "lines": [{"line": "36路", "dir": "1", "to": "浙南科技城首末站", "toShort": "浙南科技城", "node": "7站", "dist": "9分钟/3.1公里", "minutes": 9, "meters": 3100, "stations": 7, "status": "coming", "order": 29}, {"line": "36路", "dir": "2", "to": "九山首末站", "toShort": "九山", "node": "10站", "dist": "17分钟/6.6公里", "minutes": 17, "meters": 6600, "stations": 10, "status": "coming", "order": 15}], "updated": "10:51", "isHome": true}, "/api/station?name=%E7%9F%B3%E5%9D%A6": {"ok": true, "station": "石坦", "lines": [{"line": "36路", "dir": "1", "to": "浙南科技城首末站", "toShort": "浙南科技城", "node": "7站", "dist": "9分钟/3.1公里", "minutes": 9, "meters": 3100, "stations": 7, "status": "coming", "order": 29}, {"line": "36路", "dir": "2", "to": "九山首末站", "toShort": "九山", "node": "10站", "dist": "17分钟/6.6公里", "minutes": 17, "meters": 6600, "stations": 10, "status": "coming", "order": 15}], "updated": "10:51"}, "/api/station?name=%E6%96%B0%E5%9F%8E%E7%AB%99": {"ok": true, "station": "新城站", "lines": [{"line": "150路", "dir": "2", "to": "新城客运站首末站", "toShort": "新城客运站", "node": "即将到站", "dist": "小于1分钟/260米", "minutes": 0, "meters": 260, "stations": null, "status": "coming", "order": 32}, {"line": "B107路", "dir": "2", "to": "箬笠岙首末站", "toShort": "箬笠岙", "node": "即将到站", "dist": "小于1分钟/240米", "minutes": 0, "meters": 240, "stations": null, "status": "coming", "order": 3}, {"line": "9路", "dir": "2", "to": "陡门头首末站", "toShort": "陡门头", "node": "即将到站", "dist": "小于1分钟/270米", "minutes": 0, "meters": 270, "stations": null, "status": "coming", "order": 37}, {"line": "B103路", "dir": "2", "to": "双屿公交枢纽", "toShort": "双屿", "node": "即将到站", "dist": "小于1分钟/270米", "minutes": 0, "meters": 270, "stations": null, "status": "coming", "order": 13}, {"line": "B103路", "dir": "1", "to": "状元公交枢纽", "toShort": "状元", "node": "即将到站", "dist": "小于1分钟/520米", "minutes": 0, "meters": 520, "stations": null, "status": "coming", "order": 23}, {"line": "B202路", "dir": "1", "to": "S1惠民路", "toShort": "S1惠民路", "node": "即将到站", "dist": "2分钟/590米", "minutes": 2, "meters": 590, "stations": null, "status": "coming", "order": 8}, {"line": "26路", "dir": "1", "to": "黄龙首末站", "toShort": "黄龙", "node": "1站", "dist": "2分钟/830米", "minutes": 2, "meters": 830, "stations": 1, "status": "coming", "order": 7}, {"line": "B702路", "dir": "2", "to": "S1三垟湿地首末站", "toShort": "S1三垟湿地", "node": "即将到站", "dist": "2分钟/760米", "minutes": 2, "meters": 760, "stations": null, "status": "coming", "order": 28}, {"line": "26路", "dir": "2", "to": "蒲中路首末站", "toShort": "蒲中路", "node": "1站", "dist": "2分钟/910米", "minutes": 2, "meters": 910, "stations": 1, "status": "coming", "order": 26}, {"line": "B5路", "dir": "1", "to": "S1奥体中心首末站", "toShort": "S1奥体中心", "node": "2站", "dist": "3分钟/1.4公里", "minutes": 3, "meters": 1400, "stations": 2, "status": "coming", "order": 25}, {"line": "71路", "dir": "2", "to": "陡门头首末站", "toShort": "陡门头", "node": "2站", "dist": "3分钟/1.1公里", "minutes": 3, "meters": 1100, "stations": 2, "status": "coming", "order": 53}, {"line": "49路", "dir": "1", "to": "永中车站首末站", "toShort": "永中车站", "node": "2站", "dist": "3分钟/1.2公里", "minutes": 3, "meters": 1200, "stations": 2, "status": "coming", "order": 10}, {"line": "165路", "dir": "2", "to": "状元公交枢纽", "toShort": "状元", "node": "3站", "dist": "5分钟/1.7公里", "minutes": 5, "meters": 1700, "stations": 3, "status": "coming", "order": 17}, {"line": "36路", "dir": "2", "to": "九山首末站", "toShort": "九山", "node": "3站", "dist": "5分钟/1.9公里", "minutes": 5, "meters": 1900, "stations": 3, "status": "coming", "order": 28}, {"line": "B702路", "dir": "1", "to": "东瓯公交公司首末站", "toShort": "东瓯公交公司", "node": "4站", "dist": "6分钟/1.8公里", "minutes": 6, "meters": 1800, "stations": 4, "status": "coming", "order": 14}, {"line": "B112路", "dir": "2", "to": "汇昌河首末站", "toShort": "汇昌河", "node": "4站", "dist": "6分钟/2.1公里", "minutes": 6, "meters": 2100, "stations": 4, "status": "coming", "order": 15}, {"line": "100路", "dir": "1", "to": "西台首末站", "toShort": "西台", "node": "4站", "dist": "6分钟/2公里", "minutes": 6, "meters": 2000, "stations": 4, "status": "coming", "order": 18}, {"line": "66路", "dir": "2", "to": "东游路首末站", "toShort": "东游路", "node": "4站", "dist": "7分钟/2.3公里", "minutes": 7, "meters": 2300, "stations": 4, "status": "coming", "order": 38}, {"line": "B112路", "dir": "1", "to": "高新科技园首末站", "toShort": "高新科技园", "node": "4站", "dist": "7分钟/1.9公里", "minutes": 7, "meters": 1900, "stations": 4, "status": "coming", "order": 27}, {"line": "9路", "dir": "1", "to": "永中车站首末站", "toShort": "永中车站", "node": "4站", "dist": "7分钟/2.2公里", "minutes": 7, "meters": 2200, "stations": 4, "status": "coming", "order": 12}, {"line": "55路", "dir": "2", "to": "康强家园", "toShort": "康强家园", "node": "4站", "dist": "7分钟/2.2公里", "minutes": 7, "meters": 2200, "stations": 4, "status": "coming", "order": 16}, {"line": "17路", "dir": "2", "to": "会展中心首末站(工商银行)", "toShort": "会展中心", "node": "6站", "dist": "9分钟/2.9公里", "minutes": 9, "meters": 2900, "stations": 6, "status": "coming", "order": 36}, {"line": "B102路", "dir": "2", "to": "新城客运站首末站", "toShort": "新城客运站", "node": "5站", "dist": "9分钟/3.2公里", "minutes": 9, "meters": 3200, "stations": 5, "status": "coming", "order": 34}, {"line": "68路", "dir": "1", "to": "三桥下首末站(不用于上下客)", "toShort": "三桥下", "node": "6站", "dist": "10分钟/3.2公里", "minutes": 10, "meters": 3200, "stations": 6, "status": "coming", "order": 7}, {"line": "55路", "dir": "1", "to": "高新科技园首末站", "toShort": "高新科技园", "node": "6站", "dist": "10分钟/2.7公里", "minutes": 10, "meters": 2700, "stations": 6, "status": "coming", "order": 29}, {"line": "6路", "dir": "1", "to": "三桥下首末站(不用于上下客)", "toShort": "三桥下", "node": "7站", "dist": "10分钟/3.4公里", "minutes": 10, "meters": 3400, "stations": 7, "status": "coming", "order": 29}, {"line": "B5路", "dir": "2", "to": "火车南站公交枢纽", "toShort": "火车南站", "node": "6站", "dist": "11分钟/4公里", "minutes": 11, "meters": 4000, "stations": 6, "status": "coming", "order": 23}, {"line": "100路", "dir": "2", "to": "附一医南白象院区公交客运枢纽", "toShort": "附一医南白象院区公交客运枢纽", "node": "6站", "dist": "11分钟/4.1公里", "minutes": 11, "meters": 4100, "stations": 6, "status": "coming", "order": 16}, {"line": "B501路", "dir": "1", "to": "郭溪塘下首末站", "toShort": "郭溪塘下", "node": "7站", "dist": "11分钟/3.9公里", "minutes": 11, "meters": 3900, "stations": 7, "status": "coming", "order": 10}, {"line": "71路", "dir": "1", "to": "滨海首末站", "toShort": "滨海", "node": "已到站", "dist": "", "minutes": null, "meters": null, "stations": null, "status": "here", "order": 14}], "updated": "10:51"}, "/api/line?name=36%E8%B7%AF&dir=1&focus=%E7%9F%B3%E5%9D%A6": {"ok": true, "line": "36路", "dir": "1", "from": "九山首末站", "to": "浙南科技城首末站", "fromShort": "九山", "toShort": "浙南科技城", "begin": "05:50", "end": "19:00", "stops": [{"i": 1, "name": "九山首末站", "lat": 28.01829559, "lon": 120.64119233}, {"i": 2, "name": "粗糠桥", "lat": 28.01582469, "lon": 120.64022344}, {"i": 3, "name": "奥林匹克广场", "lat": 28.01131146, "lon": 120.64250018}, {"i": 4, "name": "西站(美美时尚广场)", "lat": 28.00967726, "lon": 120.64456795}, {"i": 5, "name": "清明桥", "lat": 28.00641304, "lon": 120.64706269}, {"i": 6, "name": "杏花路", "lat": 28.00366291, "lon": 120.64853254}, {"i": 7, "name": "水心小学二校区", "lat": 27.99924178, "lon": 120.6501284}, {"i": 8, "name": "市政大桥", "lat": 27.99780344, "lon": 120.65523697}, {"i": 9, "name": "银都花苑", "lat": 27.99832415, "lon": 120.66048862}, {"i": 10, "name": "白鹿洲公园", "lat": 27.99906491, "lon": 120.66773431}, {"i": 11, "name": "茶院寺", "lat": 27.99935984, "lon": 120.6721142}, {"i": 12, "name": "市体育中心南", "lat": 27.99945485, "lon": 120.67829117}, {"i": 13, "name": "时代广场", "lat": 27.999499, "lon": 120.6853753}, {"i": 14, "name": "横渎", "lat": 27.9995352, "lon": 120.6902435}, {"i": 15, "name": "市中西医结合医院", "lat": 27.99951937, "lon": 120.69361067}, {"i": 16, "name": "伯爵山庄", "lat": 27.99929578, "lon": 120.69973909}, {"i": 17, "name": "新城站", "lat": 27.99815841, "lon": 120.70729078}, {"i": 18, "name": "温州广播电视中心", "lat": 27.99490099, "lon": 120.7129364}, {"i": 19, "name": "计量大楼", "lat": 27.99193501, "lon": 120.71319043}, {"i": 20, "name": "雁湖社区", "lat": 27.98747919, "lon": 120.71480662}, {"i": 21, "name": "鸿基花苑", "lat": 27.98608754, "lon": 120.71786301}, {"i": 22, "name": "雁荡中路文昌路", "lat": 27.98224027, "lon": 120.7310649}, {"i": 23, "name": "诚鸿花苑", "lat": 27.979944, "lon": 120.73611469}, {"i": 24, "name": "慎江路", "lat": 27.97699894, "lon": 120.74236672}, {"i": 25, "name": "龙湾时尚邻里", "lat": 27.97466149, "lon": 120.74592832}, {"i": 26, "name": "雁荡东路钱江路", "lat": 27.97227306, "lon": 120.74956093}, {"i": 27, "name": "四明山路", "lat": 27.96940278, "lon": 120.74783064}, {"i": 28, "name": "温州东瓯中学", "lat": 27.96676356, "lon": 120.7463774}, {"i": 29, "name": "石坦", "lat": 27.96453167, "lon": 120.74713452}, {"i": 30, "name": "岩岙", "lat": 27.96283734, "lon": 120.75144526}, {"i": 31, "name": "兴元路", "lat": 27.96344375, "lon": 120.7540337}, {"i": 32, "name": "状元二期工业区", "lat": 27.96286515, "lon": 120.75664914}, {"i": 33, "name": "周宅", "lat": 27.96295968, "lon": 120.76005472}, {"i": 34, "name": "温州大道龙腾南路", "lat": 27.96429185, "lon": 120.76118191}, {"i": 35, "name": "温州大道富强路", "lat": 27.9625406, "lon": 120.76618974}, {"i": 36, "name": "S1科技城", "lat": 27.95510609, "lon": 120.78429046}, {"i": 37, "name": "附二医龙湾院区北", "lat": 27.94889466, "lon": 120.79909917}, {"i": 38, "name": "得利桥", "lat": 27.94709581, "lon": 120.80095434}, {"i": 39, "name": "附二医龙湾院区南", "lat": 27.9459285, "lon": 120.79736799}, {"i": 40, "name": "浙南科技城首末站", "lat": 27.94733716, "lon": 120.79391464}], "buses": [{"index": 7, "plate": "1005277", "toNext": 0}, {"index": 22, "plate": "1005266", "toNext": 464}], "hasReal": true, "focus": 29, "updated": "10:51"}, "/api/board?line=36%E8%B7%AF&dir=1&station=%E7%9F%B3%E5%9D%A6": {"ok": true, "station": "石坦", "line": "36路", "dir": "1", "main": {"line": "36路", "dir": "1", "to": "浙南科技城首末站", "toShort": "浙南科技城", "node": "7站", "dist": "9分钟/3.1公里", "minutes": 9, "meters": 3100, "stations": 7, "status": "coming", "order": 29}, "other": {"line": "36路", "dir": "2", "to": "九山首末站", "toShort": "九山", "node": "10站", "dist": "17分钟/6.6公里", "minutes": 17, "meters": 6600, "stations": 10, "status": "coming", "order": 15}, "win": {"rows": [{"i": 1, "name": "九山首末站", "mine": false, "bus": false, "eta": null, "left": null, "passed": true}, {"i": 2, "name": "粗糠桥", "mine": false, "bus": false, "eta": null, "left": null, "passed": true}, {"i": 3, "name": "奥林匹克广场", "mine": false, "bus": false, "eta": null, "left": null, "passed": true}, {"i": 4, "name": "西站(美美时尚广场)", "mine": false, "bus": false, "eta": null, "left": null, "passed": true}, {"i": 5, "name": "清明桥", "mine": false, "bus": false, "eta": null, "left": null, "passed": true}, {"i": 6, "name": "杏花路", "mine": false, "bus": false, "eta": null, "left": null, "passed": true}, {"i": 7, "name": "水心小学二校区", "mine": false, "bus": true, "eta": 1, "left": 1, "passed": false}, {"i": 8, "name": "市政大桥", "mine": false, "bus": false, "eta": 3, "left": 2, "passed": false}, {"i": 9, "name": "银都花苑", "mine": false, "bus": false, "eta": 4, "left": 3, "passed": false}, {"i": 10, "name": "白鹿洲公园", "mine": false, "bus": false, "eta": 5, "left": 4, "passed": false}, {"i": 11, "name": "茶院寺", "mine": false, "bus": false, "eta": 6, "left": 5, "passed": false}, {"i": 12, "name": "市体育中心南", "mine": false, "bus": false, "eta": 8, "left": 6, "passed": false}, {"i": 13, "name": "时代广场", "mine": false, "bus": false, "eta": 9, "left": 7, "passed": false}, {"i": 14, "name": "横渎", "mine": false, "bus": false, "eta": 10, "left": 8, "passed": false}, {"i": 15, "name": "市中西医结合医院", "mine": false, "bus": false, "eta": 12, "left": 9, "passed": false}, {"i": 16, "name": "伯爵山庄", "mine": false, "bus": false, "eta": 13, "left": 10, "passed": false}, {"i": 17, "name": "新城站", "mine": false, "bus": false, "eta": 14, "left": 11, "passed": false}, {"i": 18, "name": "温州广播电视中心", "mine": false, "bus": false, "eta": 15, "left": 12, "passed": false}, {"i": 19, "name": "计量大楼", "mine": false, "bus": false, "eta": 17, "left": 13, "passed": false}, {"i": 20, "name": "雁湖社区", "mine": false, "bus": false, "eta": 18, "left": 14, "passed": false}, {"i": 21, "name": "鸿基花苑", "mine": false, "bus": false, "eta": 19, "left": 15, "passed": false}, {"i": 22, "name": "雁荡中路文昌路", "mine": false, "bus": true, "eta": 1, "left": 1, "passed": false}, {"i": 23, "name": "诚鸿花苑", "mine": false, "bus": false, "eta": 3, "left": 2, "passed": false}, {"i": 24, "name": "慎江路", "mine": false, "bus": false, "eta": 4, "left": 3, "passed": false}, {"i": 25, "name": "龙湾时尚邻里", "mine": false, "bus": false, "eta": 5, "left": 4, "passed": false}, {"i": 26, "name": "雁荡东路钱江路", "mine": false, "bus": false, "eta": 6, "left": 5, "passed": false}, {"i": 27, "name": "四明山路", "mine": false, "bus": false, "eta": 8, "left": 6, "passed": false}, {"i": 28, "name": "温州东瓯中学", "mine": false, "bus": false, "eta": 9, "left": 7, "passed": false}, {"i": 29, "name": "石坦", "mine": true, "bus": false, "eta": 9, "left": 7, "passed": false}, {"i": 30, "name": "岩岙", "mine": false, "bus": false, "eta": 12, "left": 9, "passed": false}, {"i": 31, "name": "兴元路", "mine": false, "bus": false, "eta": 13, "left": 10, "passed": false}, {"i": 32, "name": "状元二期工业区", "mine": false, "bus": false, "eta": 14, "left": 11, "passed": false}, {"i": 33, "name": "周宅", "mine": false, "bus": false, "eta": 15, "left": 12, "passed": false}, {"i": 34, "name": "温州大道龙腾南路", "mine": false, "bus": false, "eta": 17, "left": 13, "passed": false}, {"i": 35, "name": "温州大道富强路", "mine": false, "bus": false, "eta": 18, "left": 14, "passed": false}, {"i": 36, "name": "S1科技城", "mine": false, "bus": false, "eta": 19, "left": 15, "passed": false}, {"i": 37, "name": "附二医龙湾院区北", "mine": false, "bus": false, "eta": 21, "left": 16, "passed": false}, {"i": 38, "name": "得利桥", "mine": false, "bus": false, "eta": 22, "left": 17, "passed": false}, {"i": 39, "name": "附二医龙湾院区南", "mine": false, "bus": false, "eta": 23, "left": 18, "passed": false}, {"i": 40, "name": "浙南科技城首末站", "mine": false, "bus": false, "eta": 24, "left": 19, "passed": false}], "busHere": "雁荡中路文昌路", "total": 40, "focus": 29, "pace": 1.3}, "passes": true, "total": 40, "hasReal": true, "updated": "10:51"}, "/api/line?name=36%E8%B7%AF&dir=2&focus=%E7%9F%B3%E5%9D%A6": {"ok": true, "line": "36路", "dir": "2", "from": "浙南科技城首末站", "to": "九山首末站", "fromShort": "浙南科技城", "toShort": "九山", "begin": "05:50", "end": "19:00", "stops": [{"i": 1, "name": "浙南科技城首末站", "lat": 27.94702515, "lon": 120.79373661}, {"i": 2, "name": "东悦里西", "lat": 27.94832372, "lon": 120.78971015}, {"i": 3, "name": "东悦里北", "lat": 27.94917185, "lon": 120.7909393}, {"i": 4, "name": "附二医龙湾院区南", "lat": 27.94622251, "lon": 120.79744001}, {"i": 5, "name": "温医大口腔医院", "lat": 27.9443235, "lon": 120.797393}, {"i": 6, "name": "宏周桥", "lat": 27.94531273, "lon": 120.79998924}, {"i": 7, "name": "附二医龙湾院区北", "lat": 27.94952255, "lon": 120.79792505}, {"i": 8, "name": "S1科技城", "lat": 27.95509912, "lon": 120.78455949}, {"i": 9, "name": "温州大道龙永路", "lat": 27.95667472, "lon": 120.78134705}, {"i": 10, "name": "温州大道富强路", "lat": 27.96301644, "lon": 120.76507856}, {"i": 11, "name": "周宅", "lat": 27.96292965, "lon": 120.75988068}, {"i": 12, "name": "状元二期工业区", "lat": 27.96304405, "lon": 120.75596903}, {"i": 13, "name": "兴元路", "lat": 27.96356968, "lon": 120.75360662}, {"i": 14, "name": "岩岙", "lat": 27.96301341, "lon": 120.75188633}, {"i": 15, "name": "石坦", "lat": 27.96443874, "lon": 120.7475916}, {"i": 16, "name": "温州东瓯中学", "lat": 27.96680056, "lon": 120.7464184}, {"i": 17, "name": "四明山路", "lat": 27.9695558, "lon": 120.74794066}, {"i": 18, "name": "雁荡东路钱江路", "lat": 27.97237603, "lon": 120.74942691}, {"i": 19, "name": "龙湾时尚邻里", "lat": 27.97444054, "lon": 120.74630238}, {"i": 20, "name": "慎江路", "lat": 27.97705193, "lon": 120.7422927}, {"i": 21, "name": "诚鸿花苑", "lat": 27.98011897, "lon": 120.73582064}, {"i": 22, "name": "雁荡中路文昌路", "lat": 27.98191446, "lon": 120.73236109}, {"i": 23, "name": "雁荡西路鳌江路", "lat": 27.98343549, "lon": 120.72536803}, {"i": 24, "name": "鸿基花苑", "lat": 27.98514281, "lon": 120.7200863}, {"i": 25, "name": "雁湖社区", "lat": 27.98724127, "lon": 120.7154767}, {"i": 26, "name": "计量大楼", "lat": 27.99085597, "lon": 120.71282239}, {"i": 27, "name": "温州广播电视中心", "lat": 27.99553696, "lon": 120.71268137}, {"i": 28, "name": "新城站", "lat": 27.99836437, "lon": 120.70683974}, {"i": 29, "name": "伯爵山庄", "lat": 27.99944773, "lon": 120.69914805}, {"i": 30, "name": "市中西医结合医院", "lat": 27.99959544, "lon": 120.69490575}, {"i": 31, "name": "横渎", "lat": 27.99967128, "lon": 120.69195359}, {"i": 32, "name": "交运石油", "lat": 27.99963507, "lon": 120.68752238}, {"i": 33, "name": "时代广场", "lat": 27.9995999, "lon": 120.68184522}, {"i": 34, "name": "茶院寺", "lat": 27.99963284, "lon": 120.6723692}, {"i": 35, "name": "白鹿洲公园", "lat": 27.99879903, "lon": 120.66389045}, {"i": 36, "name": "银都花苑", "lat": 27.99858211, "lon": 120.66172456}, {"i": 37, "name": "市政大桥", "lat": 27.99798741, "lon": 120.65576193}, {"i": 38, "name": "水心竹组团", "lat": 27.99746565, "lon": 120.65190424}, {"i": 39, "name": "水心小学二校区", "lat": 28.0000508, "lon": 120.64990441}, {"i": 40, "name": "杏花路", "lat": 28.00268487, "lon": 120.64907949}, {"i": 41, "name": "清明桥", "lat": 28.00647004, "lon": 120.64714267}, {"i": 42, "name": "西站(美美时尚广场)", "lat": 28.00939022, "lon": 120.64508489}, {"i": 43, "name": "奥林匹克广场", "lat": 28.01144846, "lon": 120.64250817}, {"i": 44, "name": "粗糠桥", "lat": 28.01515167, "lon": 120.64037543}, {"i": 45, "name": "九山首末站", "lat": 28.01829559, "lon": 120.64119233}], "buses": [{"index": 5, "plate": "1005276", "toNext": 212}, {"index": 25, "plate": "1005264", "toNext": 579}], "hasReal": true, "focus": 15, "updated": "10:51"}, "/api/board?line=36%E8%B7%AF&dir=2&station=%E7%9F%B3%E5%9D%A6": {"ok": true, "station": "石坦", "line": "36路", "dir": "2", "main": {"line": "36路", "dir": "2", "to": "九山首末站", "toShort": "九山", "node": "10站", "dist": "17分钟/6.6公里", "minutes": 17, "meters": 6600, "stations": 10, "status": "coming", "order": 15}, "other": {"line": "36路", "dir": "1", "to": "浙南科技城首末站", "toShort": "浙南科技城", "node": "7站", "dist": "9分钟/3.1公里", "minutes": 9, "meters": 3100, "stations": 7, "status": "coming", "order": 29}, "win": {"rows": [{"i": 1, "name": "浙南科技城首末站", "mine": false, "bus": false, "eta": null, "left": null, "passed": true}, {"i": 2, "name": "东悦里西", "mine": false, "bus": false, "eta": null, "left": null, "passed": true}, {"i": 3, "name": "东悦里北", "mine": false, "bus": false, "eta": null, "left": null, "passed": true}, {"i": 4, "name": "附二医龙湾院区南", "mine": false, "bus": false, "eta": null, "left": null, "passed": true}, {"i": 5, "name": "温医大口腔医院", "mine": false, "bus": true, "eta": 2, "left": 1, "passed": false}, {"i": 6, "name": "宏周桥", "mine": false, "bus": false, "eta": 3, "left": 2, "passed": false}, {"i": 7, "name": "附二医龙湾院区北", "mine": false, "bus": false, "eta": 5, "left": 3, "passed": false}, {"i": 8, "name": "S1科技城", "mine": false, "bus": false, "eta": 7, "left": 4, "passed": false}, {"i": 9, "name": "温州大道龙永路", "mine": false, "bus": false, "eta": 8, "left": 5, "passed": false}, {"i": 10, "name": "温州大道富强路", "mine": false, "bus": false, "eta": 10, "left": 6, "passed": false}, {"i": 11, "name": "周宅", "mine": false, "bus": false, "eta": 12, "left": 7, "passed": false}, {"i": 12, "name": "状元二期工业区", "mine": false, "bus": false, "eta": 14, "left": 8, "passed": false}, {"i": 13, "name": "兴元路", "mine": false, "bus": false, "eta": 15, "left": 9, "passed": false}, {"i": 14, "name": "岩岙", "mine": false, "bus": false, "eta": 17, "left": 10, "passed": false}, {"i": 15, "name": "石坦", "mine": true, "bus": false, "eta": 17, "left": 10, "passed": false}, {"i": 16, "name": "温州东瓯中学", "mine": false, "bus": false, "eta": 20, "left": 12, "passed": false}, {"i": 17, "name": "四明山路", "mine": false, "bus": false, "eta": 22, "left": 13, "passed": false}, {"i": 18, "name": "雁荡东路钱江路", "mine": false, "bus": false, "eta": 24, "left": 14, "passed": false}, {"i": 19, "name": "龙湾时尚邻里", "mine": false, "bus": false, "eta": 26, "left": 15, "passed": false}, {"i": 20, "name": "慎江路", "mine": false, "bus": false, "eta": 27, "left": 16, "passed": false}, {"i": 21, "name": "诚鸿花苑", "mine": false, "bus": false, "eta": 29, "left": 17, "passed": false}, {"i": 22, "name": "雁荡中路文昌路", "mine": false, "bus": false, "eta": 31, "left": 18, "passed": false}, {"i": 23, "name": "雁荡西路鳌江路", "mine": false, "bus": false, "eta": 32, "left": 19, "passed": false}, {"i": 24, "name": "鸿基花苑", "mine": false, "bus": false, "eta": 34, "left": 20, "passed": false}, {"i": 25, "name": "雁湖社区", "mine": false, "bus": false, "eta": 2, "left": 1, "passed": false}, {"i": 26, "name": "计量大楼", "mine": false, "bus": false, "eta": 3, "left": 2, "passed": false}, {"i": 27, "name": "温州广播电视中心", "mine": false, "bus": false, "eta": 5, "left": 3, "passed": false}, {"i": 28, "name": "新城站", "mine": false, "bus": false, "eta": 7, "left": 4, "passed": false}, {"i": 29, "name": "伯爵山庄", "mine": false, "bus": false, "eta": 8, "left": 5, "passed": false}, {"i": 30, "name": "市中西医结合医院", "mine": false, "bus": false, "eta": 10, "left": 6, "passed": false}, {"i": 31, "name": "横渎", "mine": false, "bus": false, "eta": 12, "left": 7, "passed": false}, {"i": 32, "name": "交运石油", "mine": false, "bus": false, "eta": 14, "left": 8, "passed": false}, {"i": 33, "name": "时代广场", "mine": false, "bus": false, "eta": 15, "left": 9, "passed": false}, {"i": 34, "name": "茶院寺", "mine": false, "bus": false, "eta": 17, "left": 10, "passed": false}, {"i": 35, "name": "白鹿洲公园", "mine": false, "bus": false, "eta": 19, "left": 11, "passed": false}, {"i": 36, "name": "银都花苑", "mine": false, "bus": false, "eta": 20, "left": 12, "passed": false}, {"i": 37, "name": "市政大桥", "mine": false, "bus": false, "eta": 22, "left": 13, "passed": false}, {"i": 38, "name": "水心竹组团", "mine": false, "bus": false, "eta": 24, "left": 14, "passed": false}, {"i": 39, "name": "水心小学二校区", "mine": false, "bus": false, "eta": 26, "left": 15, "passed": false}, {"i": 40, "name": "杏花路", "mine": false, "bus": false, "eta": 27, "left": 16, "passed": false}, {"i": 41, "name": "清明桥", "mine": false, "bus": false, "eta": 29, "left": 17, "passed": false}, {"i": 42, "name": "西站(美美时尚广场)", "mine": false, "bus": false, "eta": 31, "left": 18, "passed": false}, {"i": 43, "name": "奥林匹克广场", "mine": false, "bus": false, "eta": 32, "left": 19, "passed": false}, {"i": 44, "name": "粗糠桥", "mine": false, "bus": false, "eta": 34, "left": 20, "passed": false}, {"i": 45, "name": "九山首末站", "mine": false, "bus": false, "eta": 36, "left": 21, "passed": false}], "busHere": "温医大口腔医院", "total": 45, "focus": 15, "pace": 1.7}, "passes": true, "total": 45, "hasReal": true, "updated": "10:51"}, "/api/search?kw=159": {"ok": true, "kw": "159", "lines": [{"line": "159路", "from": "状元", "to": "浙江东方学院", "hasReal": true, "dirs": [{"dir": "1", "toShort": "浙江东方学院", "stopCount": 33}, {"dir": "2", "toShort": "状元", "stopCount": 33}]}], "stations": [], "linesTotal": 1, "stationsTotal": 0, "skipped": 0}, "/api/search?kw=36": {"ok": true, "kw": "36", "lines": [{"line": "36路", "from": "九山", "to": "浙南科技城", "hasReal": true, "dirs": [{"dir": "1", "toShort": "浙南科技城", "stopCount": 40}, {"dir": "2", "toShort": "九山", "stopCount": 45}]}, {"line": "苍南JD36路", "from": "金乡车站", "to": "南行街", "hasReal": true}, {"line": "苍南QW36路", "from": "钱库车站", "to": "钱库车站", "hasReal": true}], "stations": [], "linesTotal": 3, "stationsTotal": 0, "skipped": 0}, "/api/search?kw=S1": {"ok": true, "kw": "S1", "lines": [{"line": "微公交S1龙霞线", "from": "S1龙霞", "to": "S1龙霞", "hasReal": true}], "stations": [{"name": "S1新桥"}, {"name": "S1桐岭"}, {"name": "S1潘桥"}, {"name": "S1瑶溪"}, {"name": "S1惠民路"}, {"name": "S1瓯江口"}, {"name": "S1科技城"}, {"name": "S1龙腾路"}], "linesTotal": 1, "stationsTotal": 22, "skipped": 1}, "/api/search?kw=%E7%9F%B3%E5%9D%A6": {"ok": true, "kw": "石坦", "lines": [], "stations": [{"name": "石坦"}, {"name": "石坦路"}, {"name": "石坦农贸市场"}], "linesTotal": 0, "stationsTotal": 3, "skipped": 0}};</script><script>
 var HOME_STATION = "石坦";
 var HOME_LINE = "36路";
 var speakOn = false;
@@ -416,6 +594,31 @@ function openSheet(){
   for(var i = 0; i < os.length; i++){
     os[i].className = "opt" + (parseInt(os[i].getAttribute("data-n"), 10) === at ? " sel" : "");
   }
+  var cs = curSkin(), ts = document.querySelectorAll(".th");
+  for(var j = 0; j < ts.length; j++){
+    ts[j].className = "th" + (ts[j].getAttribute("data-sk") === cs ? " sel" : "");
+  }
+}
+
+/* 当前配色：服务端渲染时写在 body 上，前端不用自己猜 */
+function curSkin(){
+  return document.body.getAttribute("data-sk") || "c";
+}
+
+/* 换配色：记进 cookie，然后重新进一次页面（不是 reload —— 要顺手清掉地址里的
+   ?skin=，否则从对比链接进来的人换了色，刷新还是老配色，会以为没生效）。
+   清完参数 hash 还在原地，老人换个颜色不会被弹回首页。 */
+function setSkin(v){
+  if(v === curSkin()){ closeSheet(); return; }
+  /* 离线演示是单个 html 文件，没有服务端也没有 cookie，换不了色 —— 别让人点了没反应 */
+  if(location.protocol === "file:"){
+    closeSheet();
+    showBanner("演示版换不了", "装到手机上就能换", false);
+    setTimeout(hideBanner, 2600);
+    return;
+  }
+  document.cookie = "sk=" + v + ";path=/;max-age=31536000;SameSite=Lax";
+  location.replace(location.pathname + location.hash);
 }
 
 function closeSheet(){
@@ -431,6 +634,7 @@ function pickAt(n){
   _fired = {};
   closeSheet();
   viewHome();
+  syncWatch();
   showBanner("响铃已开", "车还有 " + n + " 站时会响一声", false);
   setTimeout(hideBanner, 2800);
 }
@@ -440,12 +644,14 @@ function turnOff(){
   _fired = {};
   closeSheet();
   viewHome();
+  syncWatch();
 }
 
 /* 每次轮询后检查。同一趟车只响一次，车走了再响下一趟 */
 function checkRemind(main){
   var at = remAt();
   if(!at || !main) return;
+  if(bridge()) return;   // App 里交给后台服务响，网页再响一次就成了两声
   var st = main.stations, k = main.dir || "1";
 
   if(st !== null && st > at){ delete _fired[k + "w"]; delete _fired[k + "n"]; }
@@ -460,6 +666,25 @@ function checkRemind(main){
     beep(4); buzz([300, 140, 300, 140, 300]);
     showBanner("车到站了", "快上车，往 " + (main.toShort || ""), true);
   }
+}
+
+/* --------------------------------------------------- 和 App（安卓壳）对接
+   浏览器里没有 AndroidBridge，下面每个函数都静默跳过，网页行为一点不变。
+   装成 App 之后，响铃由后台服务负责 —— 切出去、锁屏都还在看着。 */
+var _watch = null;
+
+function bridge(){
+  return (typeof AndroidBridge !== "undefined" && AndroidBridge) ? AndroidBridge : null;
+}
+
+/* 把「现在在看哪条线、响几站」告诉 App。离开到站卡片就不动它：
+   老人设好提醒往往直接按 Home 键，这时 _watch 还留着才是对的。 */
+function syncWatch(){
+  var B = bridge(); if(!B) return;
+  try{
+    if(!_watch){ B.setWatch("", "", "", 0); return; }
+    B.setWatch(_watch.line, _watch.dir, _watch.station, remAt());
+  }catch(e){}
 }
 
 function go(hash){
@@ -508,6 +733,7 @@ function viewHome(){
     if(!lines.length){ el.innerHTML = errBox("这个站没有线路", "换个站试试"); return; }
 
     var html = '<div class="nav"><span class="t">'+esc(p.station)+'站</span>'
+             + '<button class="setlink" onclick="openSheet()">设置</button>'
              + '<span class="r" id="clock"><i class="live"></i>'+p.updated+'</span></div>';
 
     html += '<div class="sbar">'
@@ -541,6 +767,8 @@ function homeSearch(){
 /* 到站卡片：一条线一个方向，就是原来首页那张卡，现在可以装任意线路 */
 function viewBoard(line, dir, station){
   var el = document.getElementById("app");
+  // 换了线路或方向，上一次选中的站就不作数了；同一条线刷新则保留
+  if(_picked && _picked.key !== (line + "/" + dir)) _picked = null;
   el.innerHTML = '<div class="loading">正在查车…</div>';
   api("/api/board?line=" + encodeURIComponent(line)
     + "&dir=" + encodeURIComponent(dir)
@@ -561,8 +789,11 @@ function viewBoard(line, dir, station){
     el.innerHTML = html;
 
     centerMyStop();
+    restorePick();
     window._speech = mainSpeech(p.main, p.other);
     if(speakOn) speak(window._speech);
+    _watch = {line: line, dir: dir, station: p.station};
+    syncWatch();
     checkRemind(p.main);
   }).catch(function(){ el.innerHTML = errBox("连不上", "检查电脑上的程序是否还在运行"); });
 }
@@ -633,6 +864,146 @@ function mainSpeech(main, other){
   return t;
 }
 
+/* ---------------------------------------------- 点站点，看车多久到
+   只改显示：不发请求、不动主数字、不新增块 —— 顶部「车现在在 X」那行就地变成估算，
+   列表高度不变，所以不会跳。老人误触也就是多出一行，点 × 就回去了。 */
+var _picked = null;      // {i, line, dir}：卡片每 15 秒重画一次，选中要能活过刷新
+
+function pickStop(el){
+  if(!el) return;
+  var box = document.getElementById("swscroll");
+  if(!box) return;
+
+  var on = el.getAttribute("data-sel") === "1";
+  var rows = box.querySelectorAll(".swrow");
+  for(var i = 0; i < rows.length; i++){
+    rows[i].removeAttribute("data-sel");
+    rows[i].className = rows[i].className.replace(" sel", "");
+  }
+  if(on){ _picked = null; fillEta(null); return; }    // 再点一次就取消
+
+  var r = rowOf(el);
+  if(!r) return;
+  _picked = {i: r.i, key: window._winKey || ""};
+  el.setAttribute("data-sel", "1");
+  el.className += " sel";
+  fillEta(el);        // 先用本地算的，立刻有数
+  etaFetch(el);       // 再问一次这一站，用真实到站覆盖
+}
+
+/* 问上游这一站的实时到站。点得快时只认最后一次，旧响应直接丢掉 */
+var _etaSeq = 0;
+
+function etaFetch(el){
+  var r = rowOf(el);
+  if(!r || !window._winKey) return;
+  if(r.mine) return;                       // 就是我这站，主数字已经准了
+  if(window.__DATA__) return;              // 离线演示页没有接口，用本地估算就够了
+  var parts = window._winKey.split("/");
+  var seq = ++_etaSeq;
+
+  api("/api/eta?line=" + encodeURIComponent(parts[0])
+      + "&dir=" + encodeURIComponent(parts[1])
+      + "&station=" + encodeURIComponent(r.name))
+  .then(function(p){
+    if(seq !== _etaSeq) return;            // 已经点了别的站
+    if(!p || !p.ok){
+      r.status = "noroute";
+      if(el.getAttribute("data-sel") === "1") fillEta(el);
+      return;
+    }
+    r.status = p.status;
+    r.eta = p.minutes;
+    r.left = p.stations;
+    r.passed = (p.status === "passed");
+    if(el.getAttribute("data-sel") === "1") fillEta(el);
+  })
+  .catch(function(){});
+}
+
+function rowOf(el){
+  var i = parseInt(el.getAttribute("data-i"), 10);
+  var rows = (window._win && window._win.rows) || [];
+  for(var k = 0; k < rows.length; k++){
+    if(rows[k].i === i) return rows[k];
+  }
+  return null;
+}
+
+function fillEta(el){
+  var bar = document.getElementById("swabove");
+  if(!bar) return;
+
+  if(!el){
+    bar.className = "swabove";
+    bar.innerHTML = (window._win && window._win.busHere)
+      ? '车现在在 ' + esc(window._win.busHere) + ' · 点站点看多久到'
+      : '点站点看车多久到';
+    return;
+  }
+
+  var r = rowOf(el);
+  if(!r) return;
+
+  /* 上游的 status 优先于本地的「已过站」判断 —— 本地说的是当前这班车开过去了，
+     上游回答的是「最近一班什么时候到这一站」，后者才是老人问的事。 */
+  var st = r.status || "";
+  var tail;
+  if(st === "passed"){
+    tail = '<b class="t">车已过站</b><span class="x">等下一班</span>';
+  } else if(st === "closed"){
+    tail = '<b class="t">今天收班了</b><span class="x">明天再来</span>';
+  } else if(st === "waiting"){
+    tail = '<b class="t">车还没发车</b><span class="x">等发车</span>';
+  } else if(st === "here"){
+    tail = '<b class="t">车在站上</b><span class="x">快上车</span>';
+  } else if(st === "noroute"){
+    tail = '<b class="t">查不到</b><span class="x">这站没车</span>';
+  } else if(r.passed){
+    tail = '<b class="t">车已过站</b><span class="x">等下一班</span>';
+  } else if(r.eta !== null && r.eta !== undefined){
+    tail = '<b class="t">约 ' + r.eta + ' 分钟</b><span class="x">· ' + r.left + ' 站</span>';
+  } else if(r.left !== null && r.left !== undefined){
+    tail = '<b class="t">还有 ' + r.left + ' 站</b><span class="x">无实时车</span>';
+  } else {
+    tail = '<b class="t">正在查…</b><span class="x">马上好</span>';
+  }
+
+  bar.className = "swabove hot";
+  bar.innerHTML = '<span class="to">到 ' + esc(r.name) + '</span>' + tail
+                + '<button class="bx" onclick="clearStop(event)" aria-label="取消选中">×</button>';
+}
+
+function clearStop(e){
+  if(e && e.stopPropagation) e.stopPropagation();
+  _picked = null;
+  var box = document.getElementById("swscroll");
+  if(box){
+    var s = box.querySelector('.swrow[data-sel="1"]');
+    if(s){ s.className = s.className.replace(" sel", ""); s.removeAttribute("data-sel"); }
+  }
+  fillEta(null);
+}
+
+/* 刷新后把选中接回来，并把视野停在那一站，别让老人重新找 */
+function restorePick(){
+  if(!_picked) return;
+  var box = document.getElementById("swscroll");
+  if(!box) return;
+  var el = box.querySelector('.swrow[data-i="' + _picked.i + '"]');
+  if(!el) return;
+  el.setAttribute("data-sel", "1");
+  el.className += " sel";
+  fillEta(el);
+  etaFetch(el);       // 15 秒刷新过一轮，这一站的数也要重问
+
+  var rowH = el.offsetHeight || 42;
+  var delta = el.getBoundingClientRect().top - box.getBoundingClientRect().top;
+  var target = box.scrollTop + delta - box.clientHeight * 0.4;
+  box.scrollTop = Math.max(0, Math.min(Math.round(target / rowH) * rowH,
+                                       box.scrollHeight - box.clientHeight));
+}
+
 function homeCard(main, other, win, station){
   station = station || HOME_STATION;
   var cls = main.dir==="1" ? "up" : "dn";
@@ -682,13 +1053,16 @@ function homeCard(main, other, win, station){
   }
   h += '</div>';
 
-  if(win && win.rows && win.rows.length){
+    if(win && win.rows && win.rows.length){
     h += '<div class="swin">';
-    if(win.busHere) h += '<div class="swabove">车现在在 '+esc(win.busHere)+'</div>';
+    h += '<div class="swabove" id="swabove">'
+       + (win.busHere ? '车现在在 '+esc(win.busHere)+' · 点站点看多久到' : '点站点看车多久到')
+       + '</div>';
     h += '<div class="swscroll" id="swscroll">';
     for(var wi = 0; wi < win.rows.length; wi++){
       var r = win.rows[wi];
-      h += '<div class="swrow' + (r.mine ? ' mine' : '') + (r.bus ? ' bus' : '') + '">'
+      h += '<div class="swrow' + (r.mine ? ' mine' : '') + (r.bus ? ' bus' : '') + '"'
+         + ' data-i="' + r.i + '" onclick="pickStop(this)">'
          + '<span class="d"></span>'
          + '<span class="n">' + esc(r.name) + '</span>'
          + (r.mine ? '<span class="tm2">你在这</span>' : '')
@@ -696,6 +1070,8 @@ function homeCard(main, other, win, station){
          + '</div>';
     }
     h += '</div></div>';
+    window._win = win;
+    window._winKey = main.line + "/" + main.dir;
   }
 
   var remTxt = remAt() ? ('响铃中 · ' + remAt() + ' 站') : '到站响铃';
@@ -1014,8 +1390,60 @@ document.addEventListener("pointerdown", function(){
 window.addEventListener("hashchange", route);
 route();
 
-/* 调试用：地址加 ?sheet=1 直接弹出响铃面板，方便截图核对 */
-if(location.search.indexOf("sheet=1") >= 0){
-  setTimeout(function(){ try{ openSheet(); }catch(e){} }, 2600);
+
+
+/* 调试用：地址加 ?sheet=1 直接弹出设置面板，方便截图核对。
+   ?sheet=now 连滑入动画一起去掉 —— 无头浏览器截图会卡在动画中间。 */
+if(location.search.indexOf("sheet=") >= 0){
+  setTimeout(function(){
+    try{
+      if(location.search.indexOf("sheet=now") >= 0){
+        var sh = document.getElementById("sheet");
+        if(sh) sh.style.transition = "none";
+      }
+      openSheet();
+    }catch(e){}
+  }, 2600);
 }
+
+/* 调试用：地址加 ?pick=站序 自动选中那一站，方便截图核对估算条
+   （只点一次 —— pickStop 是开关，点两下就取消了） */
+(function(){
+  var m = location.search.match(/[?&]pick=(\d+)/);
+  if(!m) return;
+  var hit = false;
+  var t = setInterval(function(){
+    if(hit) return;
+    var row = document.querySelector('.swrow[data-i="' + m[1] + '"]');
+    if(row){ hit = true; clearInterval(t); pickStop(row); }
+  }, 250);
+  setTimeout(function(){ clearInterval(t); }, 9000);
+})();
+
+/* 调试用：地址加 ?autoskin=d 自动点一下那个配色，验证「换了就记住」整条链路 */
+(function(){
+  var m = location.search.match(/[?&]autoskin=([cde])/);
+  if(!m) return;
+  setTimeout(function(){ try{ setSkin(m[1]); }catch(e){} }, 2200);
+})();
+
+/* 装成 App 之后，响铃的那行说明要换掉 —— 后台也响是这个版本的主要卖点。
+   顺便在面板最下面露一行服务器地址，点一下能改。 */
+(function nativeUI(){
+  var B = bridge(); if(!B) return;
+  var l = document.getElementById("limitline");
+  if(l){
+    l.textContent = "切到后台、锁屏也会响";
+    l.style.cssText = "background:#EAF5EE;color:#1B7A46;border-color:#CDE6D8";
+  }
+  var s = document.getElementById("srvline");
+  if(s){
+    var addr = "";
+    try{ addr = B.server(); }catch(e){}
+    s.style.cssText = "margin-top:14px;padding-top:12px;border-top:1px solid #EFEEE8;"
+                    + "text-align:center;font-size:13px;color:#8A8F94;line-height:1.6";
+    s.textContent = "服务器 " + addr + " · 点了能改";
+    s.onclick = function(){ try{ B.settings(); }catch(e){} };
+  }
+})();
 </script></body></html>
