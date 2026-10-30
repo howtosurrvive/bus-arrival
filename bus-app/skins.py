@@ -688,6 +688,14 @@ V2_OVERRIDE = r"""
 .srow{grid-template-columns:minmax(0,auto) minmax(0,1fr) auto}
 .srow .ln{font-size:19px}
 
+/* ---- 搜索结果里的站点行：站名占满整行，距离靠右，别用线路号那套 104px 窄列 ---- */
+.strow{grid-template-columns:minmax(0,1fr) auto;column-gap:8px}
+.strow .ln{
+  font-size:19px;line-height:1.35;
+  overflow-wrap:break-word;
+}
+.strow .dstop{font-size:14px;color:#8A8F94;white-space:nowrap}
+
 /* ---- 站牌页：底部两块间距收紧 ---- */
 .more{padding:19px 2px;font-size:15.5px}
 .tip{font-size:12.5px;color:#7A7F74;padding:8px 0 2px}

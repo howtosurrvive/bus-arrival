@@ -713,39 +713,61 @@ SEARCH_MAX_LINES = 10     # 搜「5」会返回 77 条，全列出来老人只�
 SEARCH_MAX_STATIONS = 8
 
 
-def _light_dirs(line):
-    """只查站表，给出两个方向的终点和站数。
+def _local_stations(kw, lat=None, lon=None):
+    """在本地站库里找站名。
 
-    给搜索结果用的：查车辆数据太慢，一次搜索要展开好几条线，
-    这里只拿「往哪、几站」，实时到站等进到卡片页再说。
+    上游 CMD 110 一次最多回 30 条，本地库有全市 6900 多个站 —— 站名搜索
+    改走本地，又快又全，还省掉一次网络往返（老人家里网差的时候差别很大）。
+
+    返回的 name 是**原始站名**，站牌页要拿它去查 CMD 115；
+    short 只是给人看的（「东明路口（温州口腔医院）（BRT）」念出来太啰嗦）。
     """
+    db = station_db()
+    k = (kw or "").strip()
+    if not k:
+        return []
     out = []
-    for d in ("1", "2"):
-        try:
-            st = fetch_stops(line, d)
-        except Exception:
+    for name, pts in db.items():
+        sn = short_name(name)
+        if k not in name and k not in sn:
             continue
-        if not st.get("stops"):
-            continue
-        out.append({"dir": d,
-                    "toShort": short_name(st["to"]),
-                    "stopCount": len(st["stops"])})
+        d = None
+        if lat is not None and lon is not None and pts:
+            d = int(round(min(_dist_m(lat, lon, p[0], p[1]) for p in pts)))
+        out.append({"name": name, "short": sn, "dist": d})
     return out
 
 
-def _rank(name, kw):
-    """越小越靠前：0 完全命中，1 开头命中，2 只是包含。"""
-    n = (name or "").strip()
-    k = (kw or "").strip()
-    base = n[:-1] if n.endswith("路") else n
-    if n == k or base == k:
-        return 0
-    if n.startswith(k) or base.startswith(k):
-        return 1
-    return 2
+def _station_sort(hits, kw, has_pos):
+    """站名搜索的排序。
+
+    有定位时按「距离 + 命中质量」合起来排，而不是先分档：
+
+        分数 = 距离(米) + 命中档次 × 1500
+
+    1500 米是「名字更贴」值多少路的折算 —— 名字完全一样的站，宁可多走
+    1.5 公里也去；名字只是沾边的，近 1.5 公里才抵得过。
+
+    为什么不能纯按命中排：全市 163 个站名跨县重复，搜「人民医院」时
+    纯按命中会把 54 公里外的「人民医院（洞头）」顶到最前面。
+    为什么不能纯按距离排：搜「石坦」时「石坦路」可能比「石坦」近几十米，
+    但老人要去的是「石坦」，不该被「石坦路」挡在前面。
+
+    没定位就只按命中质量排，不编距离。
+    """
+    BONUS = 1500
+
+    def key(v):
+        rank = _rank_station(v["name"], kw)
+        d = v["dist"] if (has_pos and v["dist"] is not None) else None
+        if d is None:
+            return (0, rank, 10 ** 7, len(v["name"]), v["name"])
+        return (0, d + rank * BONUS, len(v["name"]), v["name"])
+    hits.sort(key=key)
+    return hits
 
 
-def build_search(kw):
+def build_search(kw, lat=None, lon=None):
     lines, stations = [], []
     skipped = 0
     try:
@@ -769,21 +791,31 @@ def build_search(kw):
     except Exception:
         pass
 
-    try:
-        raw = api_post({**_base(), "CMD": "110", "KEYWORD": kw})
-        seen = set()
-        for s in raw.get("busstations") or []:
-            name = (s.get("stationName") or "").strip()
-            if not name or name in seen:
-                continue
-            seen.add(name)
-            stations.append({"name": name})
-    except Exception:
-        pass
+    has_pos = lat is not None and lon is not None
+    stations = _station_sort(_local_stations(kw, lat, lon), kw, has_pos)
+
+    # 本地库没命中时再问一次上游 —— 万一它那边新加了站，本地还没抓到
+    if not stations:
+        try:
+            raw = api_post({**_base(), "CMD": "110", "KEYWORD": kw})
+            seen = set()
+            for s in raw.get("busstations") or []:
+                name = (s.get("stationName") or "").strip()
+                if not name or name in seen:
+                    continue
+                seen.add(name)
+                d = None
+                if has_pos:
+                    pts = station_db().get(name)
+                    if pts:
+                        d = int(round(min(_dist_m(lat, lon, p[0], p[1]) for p in pts)))
+                stations.append({"name": name, "short": short_name(name), "dist": d})
+            stations.sort(key=lambda v: (_rank_station(v["name"], kw), len(v["name"]), v["name"]))
+        except Exception:
+            pass
 
     # 搜「5」时 5路 必须排在 50路、B105路 前面
     lines.sort(key=lambda v: (_rank(v["line"], kw), len(v["line"]), v["line"]))
-    stations.sort(key=lambda v: (_rank(v["name"], kw), len(v["name"]), v["name"]))
 
     # 用户真正想坐的那条（线路号精确命中）直接把两个方向摊开，
     # 不用再点进去选一次。同名的其他线路（苍南JD36路之类）只列一行。
@@ -801,6 +833,53 @@ def build_search(kw):
             "stations": stations[:SEARCH_MAX_STATIONS],
             "linesTotal": lines_total, "stationsTotal": stations_total,
             "skipped": skipped}
+
+
+def _light_dirs(line):
+    """只查站表，给出两个方向的终点和站数。
+
+    给搜索结果用的：查车辆数据太慢，一次搜索要展开好几条线，
+    这里只拿「往哪、几站」，实时到站等进到卡片页再说。
+    """
+    out = []
+    for d in ("1", "2"):
+        try:
+            st = fetch_stops(line, d)
+        except Exception:
+            continue
+        if not st.get("stops"):
+            continue
+        out.append({"dir": d,
+                    "toShort": short_name(st["to"]),
+                    "stopCount": len(st["stops"])})
+    return out
+
+
+def _rank(name, kw):
+    """越小越靠前：0 完全命中，1 开头命中，2 只是包含。
+
+    去掉结尾的「路」是为了线路号：搜「36」时「36路」要算完全命中。
+    站名不能这么比 —— 那会把「石坦路」当成「石坦」，所以站名走 _rank_station。
+    """
+    n = (name or "").strip()
+    k = (kw or "").strip()
+    base = n[:-1] if n.endswith("路") else n
+    if n == k or base == k:
+        return 0
+    if n.startswith(k) or base.startswith(k):
+        return 1
+    return 2
+
+
+def _rank_station(name, kw):
+    """站名的命中档次：0 一模一样，1 开头，2 只是包含。不砍「路」字。"""
+    n = (name or "").strip()
+    k = (kw or "").strip()
+    if n == k:
+        return 0
+    if n.startswith(k):
+        return 1
+    return 2
 
 
 def snapshot():
@@ -2084,6 +2163,15 @@ function viewSearch(kwArg){
     document.getElementById("sres").innerHTML =
       '<div class="panel"><div class="sec">输线路号或站名，比如 36、159、石坦</div></div>';
   }
+  // 从首页点进来的话位置已经有了；直接开搜索页（深链、刷新）则没有，
+  // 补一次定位，拿到后自动重搜一遍，结果就带上距离了。
+  if(_near.lat == null && kw){
+    locate(function(v){
+      if(!v) return;
+      _near.lat = v.lat; _near.lon = v.lon;
+      if(document.getElementById("kw")) doSearch();
+    });
+  }
   var inp = document.getElementById("kw");
   if(inp && !kw){ setTimeout(function(){ inp.focus(); }, 120); }
 }
@@ -2094,7 +2182,12 @@ function doSearch(){
   window._kw = kw;
   var box = document.getElementById("sres");
   box.innerHTML = '<div class="loading">正在搜…</div>';
-  api("/api/search?kw=" + encodeURIComponent(kw)).then(function(p){
+  // 知道自己在哪儿就带上，同名的站会按远近排
+  var q = "/api/search?kw=" + encodeURIComponent(kw);
+  if(_near.lat != null && _near.lon != null){
+    q += "&lat=" + _near.lat + "&lon=" + _near.lon;
+  }
+  api(q).then(function(p){
     if(!p.ok){ box.innerHTML = errBox("搜不了", p.error); return; }
     var h = "";
     var lines = p.lines || [], stations = p.stations || [];
@@ -2130,9 +2223,18 @@ function doSearch(){
       for(var j = 0; j < stations.length; j++){
         var s = stations[j];
         var sh = '#/s/' + encodeURIComponent(s.name);
-        h += '<div class="row" onclick="go(\'' + sh + '\')">'
-           + '<span class="ln" style="font-size:19px;min-width:auto;flex:1">'
-           + esc(s.name) + '</span><span class="arrow">›</span></div>';
+        // 站名照原样显示 —— 「人民医院（洞头）」和「人民医院」得看得出区别，
+        // 短名会把括号里的区县也砍掉，反而分不清。
+        // 跳转也用原名：站牌页要拿它去查线路。
+        var ds = "";
+        if(s.dist != null){
+          ds = s.dist < 1000 ? (s.dist + " 米") : ((s.dist / 1000).toFixed(1) + " 公里");
+        }
+        h += '<div class="row strow" onclick="go(\'' + sh + '\')">'
+           + '<span class="ln">'
+           + esc(s.name)
+           + (ds ? '　<span class="dstop">' + ds + '</span>' : '')
+           + '</span><span class="arrow">›</span></div>';
       }
     }
     if(p.skipped){
@@ -2638,7 +2740,14 @@ class Handler(BaseHTTPRequestHandler):
                 if not kw:
                     self._json({"ok": False, "error": "缺少关键词"})
                 else:
-                    self._json(build_search(kw))
+                    # 带上定位就把同名的站按远近排 —— 全市 163 个站名跨县重复，
+                    # 不排的话市区的人搜「人民医院」先看到泰顺那个
+                    try:
+                        lat = float((q.get("lat") or [""])[0])
+                        lon = float((q.get("lon") or [""])[0])
+                    except ValueError:
+                        lat = lon = None
+                    self._json(build_search(kw, lat, lon))
 
             elif path == "/icon.png":
                 try:
