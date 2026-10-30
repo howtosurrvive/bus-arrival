@@ -32,6 +32,10 @@ HOME_LINE = "36路"
 DEFAULT_SKIN = "c"         # 没选过配色时用这套（白卡 + V2 优化层）
 PORT = 8765
 
+# 这一版是什么时候起的。写进页面的 data-build，设置面板底部显示出来 ——
+# 用户问「你到底改了没有」的时候，看一眼这行字就知道手机拿到的是不是新的。
+BUILD = time.strftime("%m-%d %H:%M")
+
 # 主屏图标：不依赖 Pillow，用标准库直接编 PNG。
 # 造型是一辆正面小巴 —— 白色圆润车身、两只圆窗当眼睛、两个车轮，圆角底色。
 # 比原来那条竖线更像「车」、更软。三版只换底色和细节色，形状完全一致。
@@ -1019,6 +1023,9 @@ function openSheet(){
   for(var j = 0; j < ts.length; j++){
     ts[j].className = "th" + (ts[j].getAttribute("data-sk") === cs ? " sel" : "");
   }
+  // 这行字是给「到底改了没有」这个问题用的：手机拿到的页面是哪一版，一眼可见
+  var bl = document.getElementById("buildline");
+  if(bl) bl.textContent = "页面版本 " + (document.body.getAttribute("data-build") || "未知");
 }
 
 /* 当前配色：服务端渲染时写在 body 上，前端不用自己猜 */
@@ -1248,22 +1255,32 @@ function paintBoard(p, line, dir){
   var urgent = (main.status==="coming" && main.minutes!==null && main.minutes<=3);
   card.classList.toggle("urgent", urgent);
 
-  // 中间那块（数字 / 状态）：整块换。它不滚动、不可点，替换没有副作用
+  // 中间那块（数字 / 状态）：内容真变了才写。
+  // 原来是每次 new 一个 div 再 replaceChild —— 元素换了节点就要重排一次，
+  // 数字没变的时候也重排，看着就是「每 15 秒跳一下」。现在先比字符串。
   var mid = card.querySelector(".cmid");
   if(mid){
-    var box = document.createElement("div");
-    box.className = "cmid";
-    box.setAttribute("role", "img");
-    box.setAttribute("aria-label", ariaText(main, p.station));
-    box.innerHTML = midInner(main, p.station);
-    mid.parentNode.replaceChild(box, mid);
+    var nh = midInner(main, p.station);
+    if(mid.innerHTML !== nh) mid.innerHTML = nh;
+    var ar = ariaText(main, p.station);
+    if(mid.getAttribute("aria-label") !== ar) mid.setAttribute("aria-label", ar);
   }
 
-  // 右上角更新时间；顺便把「连不上」的灰点恢复成绿色的实时点
+  // 右上角更新时间。绿点不重建 —— 它带呼吸动画，重建会让动画从头开始，看着像闪
   var ck = document.getElementById("clock");
   if(ck){
     ck.className = "r";
-    ck.innerHTML = '<i class="live"></i>' + p.updated;
+    var lv = ck.querySelector(".live");
+    if(!lv){
+      ck.innerHTML = '<i class="live"></i>' + p.updated;
+    } else {
+      var tn = lv.nextSibling;
+      if(tn && tn.nodeType === 3){
+        if(tn.nodeValue !== p.updated) tn.nodeValue = p.updated;
+      } else {
+        ck.innerHTML = '<i class="live"></i>' + p.updated;
+      }
+    }
   }
 
   // 站点行：只动「车」那个标记，行本身（含 data-sel、滚动位置）一律不碰
@@ -1442,10 +1459,11 @@ function fillEta(el){
   if(!bar) return;
 
   if(!el){
-    bar.className = "swabove";
-    bar.innerHTML = (window._win && window._win.busHere)
+    var rest = (window._win && window._win.busHere)
       ? '车现在在 ' + esc(window._win.busHere) + ' · 点站点看多久到'
       : '点站点看车多久到';
+    if(bar.className !== "swabove") bar.className = "swabove";
+    if(bar.innerHTML !== rest) bar.innerHTML = rest;   // 没变就别写，写了就闪
     return;
   }
 
@@ -1476,9 +1494,11 @@ function fillEta(el){
     tail = '<b class="t">正在查…</b><span class="x">马上好</span>';
   }
 
-  bar.className = "swabove hot";
-  bar.innerHTML = '<span class="to">到 ' + esc(r.name) + '</span>' + tail
-                + '<button class="bx" onclick="clearStop(event)" aria-label="取消选中">×</button>';
+  var nh = '<span class="to">到 ' + esc(r.name) + '</span>' + tail
+         + '<button class="bx" onclick="clearStop(event)" aria-label="取消选中">×</button>';
+  // 15 秒刷新会重算这一行；分钟数没变时整段重写就是白闪一下，所以先比字符串
+  if(bar.className !== "swabove hot") bar.className = "swabove hot";
+  if(bar.innerHTML !== nh) bar.innerHTML = nh;
 }
 
 function clearStop(e){
@@ -1912,6 +1932,34 @@ document.addEventListener("pointerdown", function(){
 window.addEventListener("hashchange", route);
 route();
 
+/* 按压反馈：移动端 WebView 里纯 CSS :active 经常不触发 —— 浏览器要等你抬手
+   判完是点击还是滑动才决定要不要算「按下」。所以按下就加 .down，抬起或划走
+   都去掉。用事件委托，动态生成的按钮一样管用。
+   （早先只写了 .btn:active，而且误加在深色皮肤那段，白卡根本没这条，
+   点了没有任何反应。这是实装遗漏，不是缓存问题。） */
+(function(){
+  var cur = null;
+  function clear(){
+    if(cur){ cur.classList.remove("down"); cur = null; }
+  }
+  var HIT = {btn:1, opt:1, th:1, row:1, swall:1};
+  document.addEventListener("pointerdown", function(e){
+    var t = e.target;
+    while(t && t !== document.body){
+      var c = t.classList;
+      if(c && (c.contains("btn") || c.contains("opt") || c.contains("th")
+            || c.contains("row") || c.contains("swall"))){
+        clear(); cur = t; t.classList.add("down"); break;
+      }
+      t = t.parentNode;
+    }
+  }, {passive:true});
+  ["pointerup", "pointercancel"].forEach(function(ev){
+    document.addEventListener(ev, clear, {passive:true});
+  });
+  document.addEventListener("scroll", clear, {passive:true, capture:true});
+})();
+
 
 
 /* 调试用：地址加 ?sheet=1 直接弹出设置面板，方便截图核对。
@@ -1999,6 +2047,7 @@ REMIND_DOM = (
     '<div class="themes">' + _theme_buttons() + '</div>'
     '<div class="thhint">点一下就换，换完自己记住</div>'
     '<div id="srvline"></div>'
+    '<div id="buildline"></div>'
     '</div>'
 )
 
@@ -2026,7 +2075,7 @@ def page_html(skin="a", pwa=False):
             "maximum-scale=1,user-scalable=no,viewport-fit=cover\">"
             "<meta name=\"theme-color\" content=\"" + theme + "\">" + head +
             "<title>公交到站</title><style>" + css + "</style></head>"
-            "<body data-sk=\"" + skin + "\">"
+            "<body data-sk=\"" + skin + "\" data-build=\"" + BUILD + "\">"
             "<div id=\"app\" style=\"flex:1;display:flex;flex-direction:column;"
             "overflow:hidden;min-height:0\"></div>" + REMIND_DOM +
             "<script>" + JS.replace("__HOME_STATION__", HOME_STATION)

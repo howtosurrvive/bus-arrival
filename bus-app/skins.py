@@ -716,6 +716,19 @@ V2_OVERRIDE = r"""
 :focus-visible{outline:2.5px solid #0E3A63;outline-offset:2px;border-radius:8px}
 .btn:focus-visible{outline-offset:3px}
 
+/* ---- 按压反馈：白卡的 .btn 定义在 CSS_A 里，那里没有 :active，
+   必须在这一层补，否则浅色版点了毫无反应（深色版 CSS_B 自带，所以之前
+   只测深色会以为已经生效）。移动端 WebView 单靠 :active 常常不触发，
+   真正的按压态由 JS 加 .down 类，这条是给桌面和部分 WebView 兜底。 ---- */
+.btn{transition:transform .12s ease, filter .12s ease, background .12s ease}
+.btn:active,.btn.down{transform:scale(.975);filter:brightness(.94)}
+.btn.s:active,.btn.s.down{background:#E4E3DA}
+.opt:active,.opt.down{transform:scale(.975)}
+.th:active,.th.down{transform:scale(.96)}
+#buildline{margin-top:10px;text-align:center;font-size:12.5px;color:#A0A49A}
+.row:active,.row.down{background:#F1F1EA}
+.swall:active,.swall.down{opacity:.55}
+
 /* ---- 无障碍：尊重系统的「减少动态效果」 ---- */
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.01ms !important;transition-duration:.01ms !important}
