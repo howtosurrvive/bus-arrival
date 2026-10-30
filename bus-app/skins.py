@@ -789,7 +789,7 @@ V2_OVERRIDE = r"""
 .nearmore{padding:14px 16px 12px;font-size:13.5px;color:#7A7F74;line-height:1.7}
 
 /* ---- 附近站点区的收起 / 展开 ----
-   2 公里一档几十个站，全摊着的话滑到「这站有哪些车」要拨好几屏。
+   范围内站点一多，全摊着的话滑到「这站有哪些车」要拨好几屏。
    选定站以后整块收成一行摘要，线路直接顶上来。 */
 .nfold{
   display:none;margin-left:10px;padding:7px 11px;border-radius:9px;

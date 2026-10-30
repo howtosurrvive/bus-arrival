@@ -1380,9 +1380,20 @@ function stationRows(lines, station, limit){
 var _near = { lat: null, lon: null, r: 800, list: [], cur: "",
               fold: false, lstName: "", picked: false, total: 0 };
 
+/* 附近站点的距离档位。
+   「2 公里」这一档 2026-10-30 从界面上拿掉了 —— 老人要坐的车和站基本是固定的，
+   摆三档反而多一次「我该选哪个」的犹豫。实测：市区 800 米内 15–22 个站已经够用，
+   2 公里是 76–99 个，扫起来比选站还累。
+
+   代码没扔，恢复只需把下面这行改回 [300, 800, 2000]：
+   后端 build_nearby() 本来就吃任意半径（夹在 100–3000），
+   /api/nearby 里也有 `rad >= 2000 → limit 60` 的分支。实测数据见 HANDOFF 6.2b。 */
+var _RANGES = [300, 800];
+
 function nearR(){
   var v = parseInt(ls("nearR") || "800", 10);
-  return (v === 300 || v === 2000) ? v : 800;
+  // 老版本选过 2000 的，localStorage 里还留着那个值 —— 落回 800，别让她打开就是空列表
+  return _RANGES.indexOf(v) >= 0 ? v : 800;
 }
 
 function locate(cb, retried){
@@ -1436,7 +1447,7 @@ function locate(cb, retried){
 }
 
 function rangeBtns(){
-  var rs = [300, 800, 2000], h = "";
+  var rs = _RANGES, h = "";
   for(var i = 0; i < rs.length; i++){
     var t = rs[i] < 1000 ? (rs[i] + " 米") : (rs[i] / 1000 + " 公里");
     h += '<button class="rg' + (rs[i] === _near.r ? " sel" : "") + '" data-r="' + rs[i]
@@ -1527,8 +1538,16 @@ function renderNear(msg){
   }
 
   if(!rows.length){
-    box.innerHTML = '<div class="nearnone">'
-      + esc(msg || "这个范围里没有站，把范围放大一点") + '</div>';
+    // 「把范围放大一点」这句话在只剩两档之后不能照搬了：
+    // 300 米能放大到 800，800 米再往上没有档了 —— 那就直说下一步去哪儿找
+    var tip = msg;
+    if(!tip){
+      tip = _near.r < 800
+        ? "这个范围里没有站，换成「800 米」看看"
+        : "800 米内没有站。用上面的搜索框搜站名，进到那站以后点 ☆ 存下来，"
+        + "以后不用管定位也能找到";
+    }
+    box.innerHTML = '<div class="nearnone">' + esc(tip) + '</div>';
     return;
   }
 
@@ -1566,6 +1585,23 @@ function fetchNearby(){
     if(!p.ok){ renderNear("查不到附近站点"); return; }
     _near.list = p.stations || [];
     _near.total = p.total || _near.list.length;
+
+    // 定位成功、可这一圈里一个站都没有，而且用户也没自己选过站：
+    // 下面不要拿后端默认站（石坦）充数 —— 人在乐清，看到 36 路的石坦站，
+    // 会以为自己站错地方了。这里明说下一步该干什么。
+    if(!_near.list.length && !_near.picked){
+      _near.cur = "";
+      _near.lstName = "";
+      foldNear(false);
+      paintNearSlim();          // 里面的 paintCurHead 会把空标题收起来
+      // 线路区就空着 —— 上面那段提示已经把「去搜站名」说清楚了，
+      // 再补一句同样的话只会让这块看起来更像出错了
+      var el0 = document.getElementById("lst");
+      if(el0) el0.innerHTML = '';
+      renderNear("");
+      return;
+    }
+
     renderNear("");
     // 第一次来就选最近的那个；已经选过站就别动她的选择
     if(!_near.picked && _near.list.length) pickStation(_near.list[0].name, false);
@@ -1642,7 +1678,8 @@ function paintCurHead(){
   var sec = document.getElementById("cursec");
   if(!sec) return;
   var n = _near.lstName || _near.cur;
-  if(!n) return;
+  if(!n){ sec.textContent = ""; sec.style.display = "none"; return; }
+  sec.style.display = "";
   sec.textContent = (_near.fold ? "" : stTitle(n) + " · ") + "有车的在前";
 }
 
@@ -2787,9 +2824,11 @@ class Handler(BaseHTTPRequestHandler):
                     n = raw.strip()
                     if n and n not in faves:
                         faves.append(n)
-                # 2 公里在市区能筛出七八十个站，只回 30 条会把大半挡掉，
-                # 老人又不知道底下还有 —— 按范围放宽，真实总数一起给前端，
-                # 让它在列表末尾老实说「还有多少个没列出来」
+                # 按范围给上限：原来写死 30，范围一大就等于瞒着用户截断
+                # （2 公里在市区有 76 个站，界面却说「2 公里内就这些」）。
+                # 真实总数一起给前端，让它被截时在列表末尾说清楚。
+                # 「2 公里」这一档已从界面拿掉，>=2000 的分支留着 ——
+                # 将来要恢复，前端改 _RANGES 一行就够，后端不用动。
                 rad = max(100, min(3000, rad))
                 limit = 60 if rad >= 2000 else 40
                 self._json(build_nearby(lat, lon, rad, limit=limit, faves=faves))

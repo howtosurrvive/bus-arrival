@@ -125,7 +125,7 @@ td.cur{white-space:nowrap;color:#8A8F94}
   <b>一个已知限制，先说在前面：</b>石坦两个站台相距十几米，普通手机定位（尤其室内）分辨不到这个精度。所以这里<b>只做到「哪些站在范围内」</b>，不做到「你在马路哪一侧」。要分辨站台得靠导航级精度，现在没有。
 </div>
 
-<h2><span class="n">三</span>范围三档</h2>
+<h2><span class="n">三</span>范围两档</h2>
 <div class="card">
   <div class="step"><span class="box"></span><div class="t">
     <b>点「300 米」</b>
@@ -133,8 +133,9 @@ td.cur{white-space:nowrap;color:#8A8F94}
     <span class="expect">300 米内的站 ≤ 800 米内的站</span>
   </div></div>
   <div class="step"><span class="box"></span><div class="t">
-    <b>点「2 公里」</b>
-    <small>列表变长。如果这范围内没站，会说「这个范围里没有站，把范围放大一点」，不会空着一片。</small>
+    <b>再看一眼按钮：只有两档</b>
+    <small>「2 公里」已经拿掉了。老人要坐的车和站基本是固定的，三档反而多一次犹豫。</small>
+    <span class="expect">只看到「300 米」「800 米」两个按钮</span>
   </div></div>
   <div class="step"><span class="box"></span><div class="t">
     <b>杀掉 App 重开</b>
@@ -170,7 +171,7 @@ td.cur{white-space:nowrap;color:#8A8F94}
   </div></div>
   <div class="step"><span class="box"></span><div class="t">
     <b>收藏的站会一直排在最上面，不管多远</b>
-    <small>它<b>不受 300 米 / 800 米 / 2 公里 的限制</b>。这是故意的：老人真正要坐的就那两三个站，走远一点也还是它。</small>
+    <small>它<b>不受 300 米 / 800 米 的限制</b>。这是故意的：老人真正要坐的就那两三个站，走远一点也还是它。</small>
   </div></div>
   <div class="step"><span class="box"></span><div class="t">
     <b>把定位关掉，重开 App</b>
@@ -184,10 +185,10 @@ td.cur{white-space:nowrap;color:#8A8F94}
 </div>
 
 <div class="note">
-  <b>现在「2 公里内一个站都没有」这件事应该不会发生了</b> —— 站库从 36 路沿线的 116 个站扩到了<b>全市 6909 个站名</b>（市区、苍南、泰顺、永嘉、平阳、文成、洞头都收了）。<br>
+  <b>现在「附近一个站都没有」这件事应该不会发生了</b> —— 站库从 36 路沿线的 116 个站扩到了<b>全市 6909 个站名</b>（市区、苍南、泰顺、永嘉、平阳、文成、洞头都收了）。<br>
   如果还是空，只剩两个可能，要分清楚：<br>
   ① 页面写着<b>「拿不到位置」</b> → 定位没拿到，去看第一、二节；<br>
-  ② 页面写着<b>「已定位」但一个站都没有</b> → 那多半是在<b>乐清、瑞安</b>，这两个地方的数据源里没有（见 <code>HANDOFF.md</code> 第 5.4 节）。<br>
+  ② 页面写着<b>「已定位」但一个站都没有</b> → 那多半是在<b>乐清、瑞安</b>（这两个地方的数据源里没有，见 <code>HANDOFF.md</code> 第 5.4 节），或者站在远郊。页面会提示你「用上面的搜索框搜站名，进到那站以后点 ☆ 存下来」——<b>照做就行</b>，收藏的站以后不看定位也能找到。<br>
   收藏功能对这两种情况都管用 —— <b>收藏几个你实际用的站，定位好不好都不影响</b>。
 </div>
 
