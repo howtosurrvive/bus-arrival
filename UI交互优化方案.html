@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UI 交互优化方案 · 参考 finesse-skill</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  background:#FAFAF7;color:#1A1C1E;line-height:1.72;padding:34px 20px 80px;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:900px;margin:0 auto}
+h1{font-size:30px;letter-spacing:-.6px;color:#0E3A63;margin-bottom:6px}
+.sub{color:#8A8F94;font-size:14.5px;margin-bottom:26px}
+h2{
+  font-size:21px;color:#0E3A63;margin:40px 0 14px;padding-bottom:9px;
+  border-bottom:1px solid #E5E4DC;letter-spacing:-.2px;
+}
+h3{font-size:17px;color:#1A1C1E;margin:24px 0 6px}
+p{font-size:16px;color:#2E3238;margin:10px 0}
+.lead{background:#fff;border:1px solid #E5E4DC;border-radius:18px;padding:20px 22px;margin-bottom:8px}
+.lead p{margin:6px 0}
+.lead b{color:#0E3A63}
+.lead .hi{background:#FDF0E3;border-radius:6px;padding:1px 6px;color:#8F3413;font-weight:600}
+
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #E5E4DC;
+      border-radius:14px;overflow:hidden;font-size:14.5px;margin:14px 0}
+th,td{padding:11px 13px;text-align:left;border-bottom:1px solid #EFEEE7;vertical-align:top}
+th{background:#F5F5F0;color:#5C6166;font-size:13px;font-weight:600;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td code,p code,li code{background:#F1F1EA;border-radius:5px;padding:1px 6px;
+  font-family:ui-monospace,Consolas,monospace;font-size:13px;color:#3A3F45}
+.ok{color:#1F7A4D;font-weight:700;white-space:nowrap}
+.no{color:#B03A2C;font-weight:700;white-space:nowrap}
+.mid{color:#A2610F;font-weight:700;white-space:nowrap}
+
+.card{background:#fff;border:1px solid #E5E4DC;border-radius:16px;padding:18px 20px;margin:14px 0}
+.card.urgent{border-left:4px solid #C2410C}
+.card.normal{border-left:4px solid #1B5FB0}
+.card.later{border-left:4px solid #B9BCB2}
+.card .hd{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+.card .num{
+  font-size:12px;font-weight:700;color:#fff;background:#0E3A63;border-radius:6px;
+  padding:2px 8px;letter-spacing:.3px;
+}
+.card.urgent .num{background:#C2410C}
+.card.later .num{background:#8A8F94}
+.card h3{margin:0;font-size:17.5px}
+.card .why{font-size:15px;color:#4A5056;margin:8px 0 0}
+.card .why b{color:#1A1C1E}
+.fact{
+  background:#F7F7F2;border-radius:10px;padding:10px 13px;margin:10px 0;
+  font-size:14px;color:#5C6166;
+}
+.fact b{color:#1A1C1E;font-weight:600}
+.fact .m{font-family:ui-monospace,Consolas,monospace;color:#8F3413}
+pre{
+  background:#FCFCF8;border:1px solid #E5E4DC;border-radius:10px;padding:13px 15px;
+  overflow-x:auto;font-size:13px;line-height:1.65;color:#2E3238;margin:10px 0;
+  font-family:ui-monospace,Consolas,monospace;
+}
+pre .c{color:#8A8F94}
+pre .k{color:#0E3A63;font-weight:600}
+ul,ol{margin:8px 0 8px 22px}
+li{font-size:15.5px;color:#2E3238;margin:6px 0}
+li b{color:#0E3A63}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+.two > div{background:#fff;border:1px solid #E5E4DC;border-radius:14px;padding:16px 18px}
+.two h3{margin-top:0;font-size:16px}
+.two .yes h3{color:#1F7A4D}
+.two .no2 h3{color:#B03A2C}
+.two li{font-size:14.5px;margin:5px 0}
+.note{
+  background:#FFF8EC;border:1px solid #F1D9B4;border-radius:14px;padding:15px 18px;
+  margin:16px 0;font-size:15px;color:#6B4A22;
+}
+.note b{color:#8F3413}
+.foot{margin-top:40px;padding-top:18px;border-top:1px solid #E5E4DC;
+      font-size:13px;color:#9A9D93;line-height:1.9}
+@media (max-width:640px){
+  .two{grid-template-columns:1fr}
+  body{padding:22px 14px 60px}
+  h1{font-size:25px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>UI 交互优化方案</h1>
+<div class="sub">参考 <code>mouse-lin/finesse-skill</code> · 对照公交到站老人版 V1.0 · 2026-10-30</div>
+
+<div class="lead">
+  <p><b>先把结论说在前面。</b>那个项目里真正能用的只有四份文档：移动端硬底线、H5 结构、手势响应、以及"怎么说人话"。
+  它的主体是一套做营销页的审美体系，<b>和我们给 85 岁老人做工具的方向基本相反</b>，那部分不该搬。</p>
+  <p>实际对照下来，我们最该改的不是"加动效"，而是一件听起来很土的事：<span class="hi">到站卡片每 15 秒会把整页重绘一次</span>，中间闪一下"正在查车…"，列表还会滚回原位。
+  这条比任何视觉优化都重要。</p>
+</div>
+
+<h2>一、这个项目是什么</h2>
+
+<p>先说事实，避免把它的定位搞错。它不是模板库，也不是组件库，是一套<b>写给 AI 看的设计规范</b>——一个 skill 包。</p>
+
+<table>
+  <tr><th>项目</th><th>内容</th></tr>
+  <tr><td>仓库</td><td><code>mouse-lin/finesse-skill</code>，HTML 项目，912 stars，昨天还在更新</td></tr>
+  <tr><td>形态</td><td>一套 skill：<code>SKILL.md</code>（77KB 主索引）+ 30 份 <code>references/</code> 分册 + 20 多个 <code>examples/</code> 实战页</td></tr>
+  <tr><td>同一份内容</td><td>复制进 <code>.claude</code> / <code>.codebuddy</code> / <code>.doubao</code> / <code>.trae</code> 四个目录，适配不同 AI 客户端</td></tr>
+  <tr><td>面向</td><td>落地页、产品站、后台控制台、H5 活动页——<b>以"让人眼前一亮"为目标</b></td></tr>
+  <tr><td>典型评审项</td><td>SOUL（风格突出度）、SPECTACLE（动效强度）、DENSITY（信息密度）、anti-cheap（一眼 AI 感黑名单）</td></tr>
+</table>
+
+<p>它最值得学的地方，是<b>把"感觉"翻译成了可执行的规则</b>。比如"这个弹窗很廉价"这种话没法执行，它会写成"如果整个交互就是 <code>classList.toggle('on')</code> 加一个 CSS 过渡，手指只是在启动一个计时器"——这就可执行了。</p>
+
+<h2>二、它真正有用的六条主张</h2>
+
+<p>从四份文档里挑出跟"手机上天天用的工具"直接相关的，其余（3D、hero 动效、渐变审美）略过。</p>
+
+<h3>1. 只有 class 切换的交互，一眼被看穿</h3>
+<p>出处：<code>interaction-motion.md</code> §1。它把"输入的不确定性"拆成四种——<b>速度</b>（是放过去的还是甩出去的）、<b>方向</b>（横划还是竖滚）、<b>阈值</b>（轻点、拖动还是甩）、<b>掉帧</b>（浏览器把 5 个事件合并成 1 个）。处理不了这四种的，就不算手势，只是个"穿着动画外衣的开关"。</p>
+<p>对我们：设置面板现在正是这个状态——点击加 class，CSS 过渡把面板推上去。手指不参与任何决定。</p>
+
+<h3>2. 跟手四步，顺序不能换</h3>
+<p>出处：同上 §2。<b>1:1 位移 → 越界阻尼 → 阈值 → 吸附</b>。几个容易做错的细节：</p>
+<ul>
+  <li><b>跟手必须严格 1:1</b>。乘 0.85 这种"柔化"会被读成卡顿，而不是顺滑。</li>
+  <li><b>拖拽时必须摘掉 transition</b>，否则每一帧都排队进缓动曲线，跟手就没了。</li>
+  <li><b>速度要用 100ms 滑动窗口</b>。单帧瞬时值会飙到 12px/ms 的噪声；全程平均值会把最后那一甩稀释掉。文档里有实测：同一次 40px 拖动，瞬时算 12.00，窗口算 1.02。</li>
+  <li><b>松手判定的条件是"距离 或 速度"，不能只取其一</b>。只判距离 → "我甩了它却弹回来"；只判速度 → "我慢慢拖到底它却不动"。</li>
+</ul>
+
+<h3>3. 面板是五个决定，不是一个</h3>
+<p>出处：同上 §3。<b>出身</b>（从下面上来还是从中心放大——这是两种东西）、<b>层次</b>（后面的页面要"退后"，不是"变暗"）、<b>控制器</b>（能不能拖回去）、<b>档位</b>（吸附到最近的一档，绝不停在半路）、<b>去向</b>（展开成全屏是一个进度驱动四个属性）。</p>
+<p>其中"层次"这条最反直觉，也最有用：<b>深度是靠模糊和后退读出来的，只压黑会让人以为"那一层被禁用了"</b>。</p>
+
+<h3>4. 移动端六条硬底线</h3>
+<p>出处：<code>mobile-floor.md</code>。它明说这些不是偏好，违反了页面不是"差一点"，是"看着像坏了"。跟我们有关系的四条：</p>
+<table>
+  <tr><th>编号</th><th>规则</th><th>为什么</th></tr>
+  <tr><td>M1</td><td><code>overflow-x: clip</code>（不是 hidden）</td><td>hidden 会生成滚动容器，把 sticky/fixed 全部废掉</td></tr>
+  <tr><td>M2</td><td>含图的栅格用 <code>minmax(0,1fr)</code></td><td>裸 <code>1fr</code> 的最小值是内容的 max-content，会把页面撑宽</td></tr>
+  <tr><td>M3</td><td>按钮文字在任何宽度都不折行</td><td>折两行的按钮读起来像做错了，不像设计选择</td></tr>
+  <tr><td>M4</td><td>大标题加 <code>overflow-wrap:anywhere</code></td><td>长串不换行的名字在 320px 上一定溢出</td></tr>
+</table>
+
+<h3>5. 拇指区把页面上下颠倒</h3>
+<p>出处：<code>h5-mobile.md</code> §2.C。844px 高的屏幕，拇指舒服够到的是<b>下面 55%</b>。所以主操作放底部，顶部只放展示（标题、大数字）。返回按钮在左上角是唯一被接受的例外——肌肉记忆压过可达性。</p>
+<p>对我们：这条我们做对了。大数字在上（看），两个按钮在下（点）。</p>
+
+<h3>6. 说人话：术语第一次出现要跟一句解释</h3>
+<p>出处：<code>plain-words.md</code>。核心是一句：<b>用户要能判断，才叫确认；判断不了就只能说"看着还行"。</b>它甚至列了一张对照表，比如 <code>touch target</code> 要写成"按钮实际能点到的范围，太小手指会点不中"。</p>
+<p>对我们：这条对"给老人写的界面文案"同样成立，而且更重要——她不会问，她只会不用。</p>
+
+<h2>三、我们现在的实际状况</h2>
+
+<p>下面每一条都对着代码核过，不是凭印象。</p>
+
+<table>
+  <tr><th>检查项</th><th>规范要求</th><th>我们实际</th><th>判定</th></tr>
+  <tr>
+    <td>点击高亮</td><td>必须有 <code>-webkit-tap-highlight-color:transparent</code></td>
+    <td>有（3 处）</td><td class="ok">达标</td>
+  </tr>
+  <tr>
+    <td>主操作在底部</td><td>拇指区</td>
+    <td>「这站的车 / 念一遍」在底部</td><td class="ok">达标</td>
+  </tr>
+  <tr>
+    <td>按钮按压反馈</td><td>每个可点元素都要有 <code>:active</code></td>
+    <td>行和选项有，<b>底部两个大按钮没有</b>（<code>.btn</code> 无 <code>:active</code>、无 <code>transition</code>）</td><td class="no">缺</td>
+  </tr>
+  <tr>
+    <td>触控目标 ≥44px</td><td>44×44 是底线</td>
+    <td>站点行 <code>42px</code>；其余按钮 48–60px</td><td class="no">差 2px</td>
+  </tr>
+  <tr>
+    <td>安全区适配</td><td><code>env(safe-area-inset-*)</code> 包在 <code>calc()</code> 里</td>
+    <td><b>0 处</b>。但 viewport 已设 <code>viewport-fit=cover</code></td><td class="no">缺</td>
+  </tr>
+  <tr>
+    <td>刷新时不打断阅读</td><td>只更新变了的，不重建整块</td>
+    <td><b>每 15 秒整页重绘</b>，先闪 loading</td><td class="no">明显缺陷</td>
+  </tr>
+  <tr>
+    <td>面板层次</td><td>后面的页面要退后</td>
+    <td>遮罩只压黑 40%，页面不动</td><td class="mid">半达标</td>
+  </tr>
+  <tr>
+    <td>面板可拖</td><td>能拖回去，带把手</td>
+    <td>不能拖，没有把手，只能点遮罩关</td><td class="no">缺</td>
+  </tr>
+  <tr>
+    <td>页面切换</td><td>不能有中间白帧</td>
+    <td>整页 <code>innerHTML</code> 替换，先显示 loading</td><td class="mid">有中断</td>
+  </tr>
+  <tr>
+    <td>字号下限</td><td>11px 在廉价屏上读不了，正文 14–15</td>
+    <td>正文 15–17 够；<b>8 处小徽章 11–11.5px</b>（「你在这」「车」「终点」这类）</td><td class="mid">偏低</td>
+  </tr>
+</table>
+
+<div class="fact">
+  <b>关于那条最要紧的：</b><code>viewBoard()</code> 第一行就是 <code>el.innerHTML = '&lt;div class="loading"&gt;正在查车…&lt;/div&gt;'</code>，
+  而 <code>setInterval(viewBoard, 15000)</code> 调的正是它。实测接口 0.12–0.27 秒（本机缓存命中时），
+  也就是说<span class="m">每 15 秒画面会完整闪一下，再重新滚一次列表</span>。老人正盯着数字看的时候，这 0.2 秒足够让她以为手机卡了。
+</div>
+
+<h2>四、该借鉴的，和不该借鉴的</h2>
+
+<p>这一节是整个评估里最需要克制的部分。那个项目的审美取向是"让人记住"，我们的是"让人不用想"。硬搬会出事。</p>
+
+<div class="two">
+  <div class="yes">
+    <h3>值得借鉴</h3>
+    <ul>
+      <li><b>刷新只改变化的部分</b>——它整套文档都反对"中间白帧"和"整块重绘"</li>
+      <li><b>按压必须有反馈</b>（<code>:active</code>），手机上这是唯一的即时回应</li>
+      <li><b>44px 触控底线</b>，对老人要再放宽</li>
+      <li><b>面板要有把手</b>——不是装饰，是"这东西能拖"的唯一提示</li>
+      <li><b>遮罩要后退不要压黑</b>——"页面还在，只是退到后面了"</li>
+      <li><b>安全区</b>——底部手势条会盖住按钮</li>
+      <li><b>说人话</b>——第一次出现的概念要跟一句解释</li>
+    </ul>
+  </div>
+  <div class="no2">
+    <h3>不该借鉴</h3>
+    <ul>
+      <li><b>加噪点、避免纯白</b>——它的 anti-cheap 说大色块要加一层噪点才不"塑料"。对老人这是降清晰度</li>
+      <li><b>SPECTACLE / hero 动效 / 3D 引擎</b>——它整套在评"视觉有多动"，我们越静越好</li>
+      <li><b>大圆角 28–30px、玻璃拟态</b>——观感取向不同，且玻璃会削弱对比度</li>
+      <li><b>全大写小字 eyebrow</b>——中文没有这个概念</li>
+      <li><b>FLIP 转场、多档位面板、滑动返回</b>——见第五节 P2，对老人收益接近零</li>
+      <li><b>横幅式 P0/P1/P2 评审话术</b>——它面向的是"要不要上线"，我们面向的是"她能不能用"</li>
+    </ul>
+  </div>
+</div>
+
+<h2>五、优化方案</h2>
+
+<p>按"对她实际使用的影响"排，不按"技术上先不先进"排。每条都给了具体改法和成本。</p>
+
+<h3 style="color:#B03A2C;margin-top:30px">P0 · 现在就能感觉到的问题</h3>
+
+<div class="card urgent">
+  <div class="hd"><span class="num">P0-1</span><h3>静默刷新：别再每 15 秒重画一次</h3></div>
+  <p class="why">这是目前最影响体验的一条。<b>现象：</b>老人盯着「9 分钟」看，15 秒后整页变成"正在查车…"再变回来，站点列表还会重新滚到"你在这"那一行。如果她正往下翻看后面几站，会被拽回去。</p>
+  <div class="fact">
+    证据：<code>viewBoard()</code> 首行 <code>el.innerHTML = '&lt;div class="loading"&gt;…'</code>；
+    <code>setInterval(…viewBoard…, 15000)</code>；接口实测 <span class="m">0.12–0.27s</span>（弱网会更久）；
+    刷新后无条件调 <code>centerMyStop()</code>，滚动位置被重算。
+  </div>
+  <p class="why"><b>改法：</b>把"首屏渲染"和"后台刷新"分开。第一次进来照旧显示 loading；之后每 15 秒走静默通道——只更新变了的那几个节点，不重建列表。</p>
+<pre><span class="c">// 现在的写法：每次刷新都是全新一页</span>
+function viewBoard(line, dir, station){
+  el.innerHTML = '&lt;div class="loading"&gt;正在查车…&lt;/div&gt;';   <span class="c">// ← 每 15 秒都执行</span>
+  api(...).then(p =&gt; { el.innerHTML = 拼整页(); centerMyStop(); });
+}
+
+<span class="c">// 改成：首屏走原来的路，刷新只贴数据</span>
+function viewBoard(line, dir, station, silent){
+  if(!silent) el.innerHTML = '&lt;div class="loading"&gt;正在查车…&lt;/div&gt;';
+  api(...).then(p =&gt; {
+    if(!p.ok){ return; }
+    if(silent &amp;&amp; paintBoard(p)) return;   <span class="c">// 只改字，不重建 DOM</span>
+    el.innerHTML = 拼整页();
+  });
+}
+
+<span class="c">// paintBoard 只做三件事：大数字、每行状态、左上时间</span>
+function paintBoard(p){
+  var n = document.getElementById("bigNum");
+  if(!n) return false;
+  setText("bigNum", p.main.minutes);          <span class="c">// 变了才加 transition</span>
+  setText("stLeft", "还有 " + p.main.stations + " 站");
+  setText("clock",  p.updated);
+  p.win.rows.forEach(r =&gt; {                   <span class="c">// 只动有车的行</span>
+    var row = box.querySelector('.swrow[data-i="' + r.i + '"]');
+    if(row) row.classList.toggle("bus", !!r.bus);
+  });
+  <span class="c">// 不调 centerMyStop()：她滚到哪就是哪</span>
+  return true;
+}
+</pre>
+  <p class="why"><b>预期效果：</b>画面不再闪；她往下翻看后面站点时不会被打断；选中站和滚动位置天然保持（DOM 没动）。<br>
+  <b>成本：</b>中。要重排 <code>homeCard()</code> 的返回结构，给几个关键节点加 id。约 60–80 行。<br>
+  <b>风险：</b>线路、方向、站台变了的时候必须退回首屏路径（用 <code>_watch</code> 比对即可）。</p>
+</div>
+
+<div class="card urgent">
+  <div class="hd"><span class="num">P0-2</span><h3>底部两个大按钮，点了没反应</h3></div>
+  <p class="why">「这站的车」「念一遍」是整页最常点的两个东西，但 <code>.btn</code> 既没有 <code>:active</code> 也没有 <code>transition</code>。老人点下去，屏幕一动不动，她会以为没点中，于是连点三下。</p>
+  <p class="why"><b>改法：</b>一行 CSS，加在皮肤里（三套配色一起生效）。</p>
+<pre>.btn{
+  transition:transform .12s ease, filter .12s ease;
+  -webkit-tap-highlight-color:transparent;
+}
+.btn:active{ transform:scale(.975); filter:brightness(.96); }
+<span class="c">/* 老年人手抖，按压时长可能很短；.12s 比常规 .2s 更跟手 */</span>
+</pre>
+  <p class="why"><b>预期效果：</b>点下去有一点点内缩，手指立刻知道"收到了"。<br><b>成本：</b>3 行。风险为零。</p>
+</div>
+
+<div class="card urgent">
+  <div class="hd"><span class="num">P0-3</span><h3>站点行 42px，比底线少 2px</h3></div>
+  <p class="why">规范底线是 44×44。老人手指接触面比年轻人大，2px 的差距在"边走路边点"的时候会放大成点错行——点到了错误的站，看到的是另一个站的到站时间，比点不中更糟。</p>
+  <p class="why"><b>改法：</b>行高 42 → <b>46</b>。JS 里两处 <code>offsetHeight || 42</code> 的兜底值同步改掉，其余计算本来就读实测高度，会自动跟上。</p>
+<pre>.swrow{ height:46px }        <span class="c">/* 106 行，原 42px */</span>
+var rowH = me.offsetHeight || 46;   <span class="c">/* 1241 行 */</span>
+var rowH = el.offsetHeight || 46;   <span class="c">/* 1421 行 */</span>
+</pre>
+  <p class="why"><b>预期效果：</b>点中率上升，误触相邻行的情况减少。<br><b>成本：</b>3 处改动。列表是固定高度的滚动窗口，行变高只影响"一屏能看几站"（40 站窗口从 9 行变 8 行），可接受。</p>
+</div>
+
+<div class="card urgent">
+  <div class="hd"><span class="num">P0-4</span><h3>底部按钮会被手势条压住</h3></div>
+  <p class="why">我们设了 <code>viewport-fit=cover</code>，但 CSS 里 <code>env(safe-area-inset-*)</code> 一处都没用。在 iPhone 和带手势条的安卓机上，底部那条 34px 的横条会盖住 <code>.btnrow</code> 只有 18px 的下边距——「念一遍」按钮的下沿正好被压在下面。</p>
+  <p class="why"><b>改法：</b>用 <code>max()</code> 兜底，支持的设备拿安全区，不支持的回落到原值——渐进增强，不会更差。</p>
+<pre>.btnrow{ padding:10px 14px max(18px, env(safe-area-inset-bottom)) }
+.sheet { padding-bottom:calc(env(safe-area-inset-bottom) + 20px) }
+.nav   { padding-top:max(19px, env(safe-area-inset-top)) }
+<span class="c">/* 安卓 WebView 里 env() 可能返回 0，max() 会退回原值，不亏 */</span>
+</pre>
+  <p class="why"><b>预期效果：</b>全面屏手机上按钮不再被压。<br>
+  <b>成本：</b>3 行。<b>注意：</b>安卓壳里 WebView 在状态栏下方，顶部这条收益不确定，底部这条确定有用。</p>
+</div>
+
+<h3 style="color:#1B5FB0;margin-top:34px">P1 · 明显更像"一个 App"</h3>
+
+<div class="card normal">
+  <div class="hd"><span class="num">P1-1</span><h3>设置面板：加把手、能下滑关掉、后面那层退后</h3></div>
+  <p class="why">现在这个面板只能点遮罩关，没有任何"能拖"的提示。规范里说得很直接：<b>一个只能靠遮罩或 X 关掉的面板，就是一个圆了角的对话框。</b></p>
+  <p class="why"><b>改法分三步，可以只做前两步：</b></p>
+  <ol>
+    <li><b>加把手</b>（42×4px，圆角，14% 墨色）。成本 5 行，效果立竿见影——她看见那根小横条就知道能往下推。</li>
+    <li><b>后面那层退后</b>：打开时给页面 <code>scale(.96) + brightness(.96)</code>，而不是只压黑。规范的解释是"只压黑会让人以为那一层被禁用了，而不是退到后面去了"。<span style="color:#8F3413">对老人尤其重要——她会以为坏了。</span></li>
+    <li><b>可以往下拖</b>：跟手 1:1、越界阻尼、松手用"距离超过 1/4 或速度超过 0.5px/ms"两个条件任一成立就关。这一段就是规范 §2 的完整实现，约 60 行。</li>
+  </ol>
+<pre><span class="c">/* 把手 */</span>
+.sheet::before{
+  content:"";display:block;width:42px;height:4px;border-radius:99px;
+  background:rgba(26,28,30,.14);margin:-8px auto 10px;
+}
+<span class="c">/* 后面那层退后，而不是只变暗 */</span>
+#app.back{ transform:scale(.96); filter:brightness(.96);
+           transition:transform .32s, filter .32s; }
+</pre>
+  <p class="why"><b>预期：</b>面板第一次真正"像 App 弹出来的"，而不是网页上浮出来一块。<br><b>成本：</b>第 1、2 步各 5 分钟；第 3 步约 1 小时。<b>建议：</b>先做 1+2，观察老太太会不会去拖；会拖再加第 3 步。</p>
+</div>
+
+<div class="card normal">
+  <div class="hd"><span class="num">P1-2</span><h3>换页别硬切，给 120ms 的进入</h3></div>
+  <p class="why">现在从首页点一条线，整页 <code>innerHTML</code> 直接换掉。规范把这种情况叫"中间那一帧空白"——它等于在说"这是两件不相关的事"。老人会觉得"我刚才那页没了"。</p>
+  <p class="why"><b>改法：</b>不做 FLIP（见 P2），只给新内容一个极轻的进入：位移 10px + 淡入 120ms。关键是<b>快</b>——超过 200ms 老人会觉得卡。</p>
+<pre>@keyframes enter{ from{opacity:.4;transform:translateY(10px)} to{opacity:1;transform:none} }
+#app &gt; *{ animation:enter .12s ease-out both }
+@media (prefers-reduced-motion:reduce){ #app &gt; *{animation:none} }
+</pre>
+  <p class="why"><b>预期：</b>点击后是"翻开一页"而不是"闪一下换了个屏"。<br><b>成本：</b>4 行。风险：动画期间点不到元素——120ms 内基本无感，可接受。</p>
+</div>
+
+<div class="card normal">
+  <div class="hd"><span class="num">P1-3</span><h3>数字变了，让她知道变了</h3></div>
+  <p class="why">车从 9 分钟变 8 分钟，现在是静默替换。她可能正低头看站牌，抬头时不知道这数是不是新的；也可能以为刚才看错了。这是<b>"到站提醒"之外最便宜的一条安心感</b>。</p>
+  <p class="why"><b>改法：</b>只在数字<b>下降</b>时给一次轻微的高亮（不是跳动——跳动会让人以为出错了）。</p>
+<pre>function setBig(v){
+  var el = document.getElementById("bigNum");
+  if(el.textContent === String(v)) return;
+  el.textContent = v;
+  el.classList.remove("bump"); void el.offsetWidth;   <span class="c">// 强制重排，动画才能重播</span>
+  el.classList.add("bump");
+}
+.bump{ animation:bump .5s ease-out }
+@keyframes bump{ 0%{color:#1F9E5A} 100%{color:inherit} }
+</pre>
+  <p class="why"><b>预期：</b>数字一变，颜色轻轻一变再回来，眼睛会捕捉到。<br><b>成本：</b>8 行。<b>依赖：</b>P0-1 做完才有意义（整页重绘时动画会重播，反而乱）。</p>
+</div>
+
+<h3 style="color:#8A8F94;margin-top:34px">P2 · 评估后建议不做</h3>
+
+<div class="card later">
+  <div class="hd"><span class="num">P2-1</span><h3>FLIP 转场（卡片从列表项里"长出来"）</h3></div>
+  <p class="why">规范里有一整套实现，效果确实高级。但它是给"看图看物件"的场景用的——照片、商品卡。<b>我们点的是一个数字列表项，长出来的过程没有信息增量</b>，反而把"我已经到详情页了"这个认知拖慢 400ms。老人不需要这个。</p>
+  <p class="why"><b>结论：不做。</b>P1-2 的 120ms 已经解决了"白帧"这个真问题。</p>
+</div>
+
+<div class="card later">
+  <div class="hd"><span class="num">P2-2</span><h3>多档位面板、滑动返回</h3></div>
+  <p class="why">多档位（半开/全开）是为内容多的面板准备的，我们面板就 500px 高，一档到底。滑动返回是安卓系统手势，我们没拦它，本来就能用——再加一层自己实现反而会和系统打架。</p>
+  <p class="why"><b>结论：不做。</b></p>
+</div>
+
+<div class="card later">
+  <div class="hd"><span class="num">P2-3</span><h3>11px 徽章提到 12px</h3></div>
+  <p class="why">「你在这」「车」「终点」这类小徽章现在是 11–11.5px，全项目 8 处。规范说 11px 在便宜屏上读不了。<b>但它们不是信息主体</b>，位置和颜色已经说明一切，涨到 12px 只是顺手。放在最后做。</p>
+  <p class="why"><b>成本：</b>8 处数字改动。</p>
+</div>
+
+<h2>六、实施建议</h2>
+
+<p><b>分两次做，中间隔一次真机验证。</b>别一次全改——老人用东西，一次变太多她会认不出。</p>
+
+<table>
+  <tr><th>批次</th><th>内容</th><th>大概工作量</th><th>怎么验收</th></tr>
+  <tr>
+    <td><b>第一批</b></td>
+    <td>P0-1 静默刷新、P0-2 按钮按压、P0-3 行高 46、P0-4 安全区</td>
+    <td>半天</td>
+    <td>盯着卡片看 1 分钟：<b>画面不该闪</b>；往下翻到第 30 站，等 15 秒，<b>不该被拽回去</b>；按住底部按钮，<b>该有内缩</b>；全面屏手机上按钮<b>不该被手势条压住</b></td>
+  </tr>
+  <tr>
+    <td><b>第二批</b></td>
+    <td>P1-1 面板把手 + 退后、P1-2 换页进入、P1-3 数字变化</td>
+    <td>一天（含面板拖拽则再加半天）</td>
+    <td>打开设置，<b>第一眼该看到把手</b>；面板打开时后面的页面<b>该变小变模糊</b>，不是单纯变暗；点一条线，<b>不该有中间那一帧空白</b>；数字变了<b>该轻轻闪一下</b></td>
+  </tr>
+  <tr>
+    <td><b>不做</b></td>
+    <td>FLIP 转场、多档位、滑动返回、噪点质感、渐变文字</td>
+    <td>—</td>
+    <td>这些是营销页的加分项，不是工具的必要项</td>
+  </tr>
+</table>
+
+<div class="note">
+  <b>一句话判断标准。</b>规范里有句话可以拿来当验收尺子：<b>"一格够不够高级，看的不是它有几条动画，而是它有没有在处理输入本身的不确定性。"</b>
+  对老人版可以改成：<b>一眼看上去，她知不知道刚才发生了什么、现在该点哪儿。</b>
+  按这把尺子，P0-1 和 P1-3 的价值远大于任何转场动画。
+</div>
+
+<div class="foot">
+  参考：<code>mouse-lin/finesse-skill</code>（912★）中的 <code>mobile-floor.md</code>、<code>h5-mobile.md</code>、
+  <code>interaction-motion.md</code>、<code>plain-words.md</code><br>
+  对照对象：公交到站老人版 V1.0（<code>bus-app/server.py</code>、<code>bus-app/skins.py</code>）· 所有"我们实际"一栏均对代码核过<br>
+  2026-10-30
+</div>
+
+</div>
+</body>
+</html>

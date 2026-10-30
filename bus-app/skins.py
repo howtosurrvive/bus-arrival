@@ -103,7 +103,7 @@ body{
   pointer-events:none;
 }
 .swabove{font-size:13.5px;color:#9A6A2E;padding:4px 0 2px;flex-shrink:0}
-.swrow{position:relative;display:flex;align-items:center;gap:10px;height:42px;flex-shrink:0;padding-left:25px}
+.swrow{position:relative;display:flex;align-items:center;gap:10px;height:46px;flex-shrink:0;padding-left:25px}
 .swrow::before{
   content:"";position:absolute;left:4px;top:0;bottom:0;
   width:1.5px;background:#DBDAD1;
@@ -577,10 +577,17 @@ body{
 
 /* ---------------------------------------------------------- 底部按钮 */
 .btnrow{display:flex;gap:9px;padding:10px 14px 18px;flex-shrink:0}
+/* 底部留白躲开全面屏的手势条。先给普通值兜底，再用 max() 覆盖 ——
+   env() 不被支持时整条声明会被丢掉，所以不能只写一条。 */
+.btnrow{padding-bottom:max(18px, env(safe-area-inset-bottom))}
 .btn{
   flex:1;height:60px;border:none;border-radius:19px;font-size:17px;
   font-weight:600;font-family:inherit;cursor:pointer;
+  transition:transform .12s ease, filter .12s ease;
+  -webkit-tap-highlight-color:transparent;
 }
+/* 手机上按下去必须有回应。老人点了没动静会以为没点中，接着连点三下 */
+.btn:active{transform:scale(.975);filter:brightness(.96)}
 .btn.p{background:#0B2743;color:#fff;box-shadow:0 10px 22px -14px rgba(11,39,67,.95)}
 .btn.s{background:#fff;color:#2A3238;border:1px solid #DDDFD2}
 .btn.on{background:#123A5C;color:#fff}
@@ -737,16 +744,21 @@ V2_OVERRIDE = r"""
   .sub{margin-top:5px}
   .swin{margin-top:10px;padding-top:4px}
   .swabove{padding:1px 0 0}
-  .swrow{height:40px}
+  .swrow{height:44px}   /* 矮屏收到 44，正好是触控底线，再小就点不准了 */
   .cfoot{padding-top:8px}
-  .btnrow{padding-top:8px;padding-bottom:8px}
+  .btnrow{padding-top:8px;padding-bottom:max(12px, env(safe-area-inset-bottom))}
   .btn{height:58px}
 }
+
+/* ---------------------------------------------------------- 顶栏安全区 */
+/* 刘海屏上标题会被状态栏压住。同样是先兜底再覆盖。 */
+.nav{padding:20px 20px 13px;padding-top:max(20px, env(safe-area-inset-top))}
 
 /* ---------------------------------------------------------- 设置面板：配色 */
 /* 面板现在有响铃和配色两段，小屏（640 高）会顶到屏幕外，给它自己能滚 */
 .sheet{max-height:90vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
-       scrollbar-width:none}
+       scrollbar-width:none;
+       padding-bottom:calc(22px + env(safe-area-inset-bottom, 0px))}
 .sheet::-webkit-scrollbar{display:none}
 .sheet .sect-t{
   font-size:13.5px;font-weight:600;color:#96998F;letter-spacing:.2px;

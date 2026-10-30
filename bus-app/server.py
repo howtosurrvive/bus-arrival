@@ -1186,20 +1186,28 @@ function homeSearch(){
 }
 
 /* 到站卡片：一条线一个方向，就是原来首页那张卡，现在可以装任意线路 */
-function viewBoard(line, dir, station){
+function viewBoard(line, dir, station, silent){
   var el = document.getElementById("app");
   // 换了线路或方向，上一次选中的站就不作数了；同一条线刷新则保留
   if(_picked && _picked.key !== (line + "/" + dir)) _picked = null;
-  el.innerHTML = '<div class="loading">正在查车…</div>';
+  // 只有第一次进来才显示「正在查车」。15 秒的定时刷新走静默路径 ——
+  // 整页清空再重画会让画面闪一下、还会把老人正在翻的站点列表拽回原位。
+  if(!silent) el.innerHTML = '<div class="loading">正在查车…</div>';
   api("/api/board?line=" + encodeURIComponent(line)
     + "&dir=" + encodeURIComponent(dir)
     + "&station=" + encodeURIComponent(station || ""))
   .then(function(p){
-    if(!p.ok){ el.innerHTML = errBox("没查到车", p.error); return; }
+    if(!p.ok){
+      if(silent) return;                  // 刷新失败就留着旧画面，别把错误糊上去
+      el.innerHTML = errBox("没查到车", p.error);
+      return;
+    }
+    // 静默刷新：能贴数据就贴，贴不了（换线了、DOM 不在了）再退回首屏重绘
+    if(silent && paintBoard(p, line, dir)) return;
 
     var html = '<div class="nav"><button class="back" onclick="back()">‹ 返回</button>'
              + '<span class="t">'+esc(p.station)+'站</span>'
-             + '<span class="r"><i class="live"></i>'+p.updated+'</span></div>';
+             + '<span class="r" id="clock"><i class="live"></i>'+p.updated+'</span></div>';
     html += '<div class="scroll home">';
     html += homeCard(p.main, p.other, p.win, p.station);
     html += '</div>';
@@ -1216,7 +1224,85 @@ function viewBoard(line, dir, station){
     _watch = {line: line, dir: dir, station: p.station};
     syncWatch();
     checkRemind(p.main);
-  }).catch(function(){ el.innerHTML = errBox("连不上", "检查电脑上的程序是否还在运行"); });
+  }).catch(function(){
+    if(silent) return;                     // 网络抖一下不该把整页换成错误提示
+    el.innerHTML = errBox("连不上", "检查电脑上的程序是否还在运行");
+  });
+}
+
+/* 静默刷新：只改「变了的那几个字」，不重建 DOM。
+   这样滚动位置、点选的站、列表的滚动惯性全都原样保留 —— 老人正看到一半，
+   画面不该因为她等了两秒就被重来一次。
+   返回 false 表示贴不上去（换线路了 / DOM 不在了），交给首屏重绘兜底。 */
+function paintBoard(p, line, dir){
+  var card = document.querySelector(".card");
+  if(!card) return false;
+  // 线路或方向对不上，说明这次刷新的结果不该覆盖当前画面
+  var no = card.querySelector(".lineno");
+  if(no && no.textContent !== p.main.line) return false;
+  if(_watch && (_watch.line !== line || _watch.dir !== dir)) return false;
+
+  var main = p.main, win = p.win;
+
+  // 卡片紧急态（3 分钟内变红）可能变
+  var urgent = (main.status==="coming" && main.minutes!==null && main.minutes<=3);
+  card.classList.toggle("urgent", urgent);
+
+  // 中间那块（数字 / 状态）：整块换。它不滚动、不可点，替换没有副作用
+  var mid = card.querySelector(".cmid");
+  if(mid){
+    var box = document.createElement("div");
+    box.className = "cmid";
+    box.setAttribute("role", "img");
+    box.setAttribute("aria-label", ariaText(main, p.station));
+    box.innerHTML = midInner(main, p.station);
+    mid.parentNode.replaceChild(box, mid);
+  }
+
+  // 右上角更新时间；顺便把「连不上」的灰点恢复成绿色的实时点
+  var ck = document.getElementById("clock");
+  if(ck){
+    ck.className = "r";
+    ck.innerHTML = '<i class="live"></i>' + p.updated;
+  }
+
+  // 站点行：只动「车」那个标记，行本身（含 data-sel、滚动位置）一律不碰
+  if(win && win.rows){
+    for(var i = 0; i < win.rows.length; i++){
+      var r = win.rows[i];
+      var row = card.querySelector('.swrow[data-i="' + r.i + '"]');
+      if(!row) continue;
+      if(!!r.bus !== row.classList.contains("bus")) row.classList.toggle("bus", !!r.bus);
+      var tb = row.querySelector(".tb");
+      if(r.bus && !tb){
+        var sp = document.createElement("span");
+        sp.className = "tb";
+        sp.textContent = "车";
+        row.appendChild(sp);
+      } else if(!r.bus && tb){
+        row.removeChild(tb);
+      }
+    }
+  }
+
+  // 列表上方那句话。正在看某一站的到站时间时不动它，否则会把估算条顶掉
+  var ab = document.getElementById("swabove");
+  if(ab && !ab.classList.contains("hot")) ab.textContent = aboveText(win);
+
+  window._win = win;
+  window._winKey = main.line + "/" + main.dir;
+
+  // 选中了某站：用新数据重算那一行，再问一次上游把分钟数校准
+  if(_picked){
+    var sel = card.querySelector('.swrow[data-sel="1"]');
+    if(sel){ fillEta(sel); etaFetch(sel); }
+    else { _picked = null; }
+  }
+
+  _watch = {line: line, dir: dir, station: p.station};
+  syncWatch();
+  checkRemind(main);
+  return true;
 }
 
 /* 把站点列表滚到合适的位置：
@@ -1238,7 +1324,7 @@ function centerMyStop(){
     return;
   }
 
-  var rowH = me.offsetHeight || 42;
+  var rowH = me.offsetHeight || 46;
   var anchor = me, pad = rowH * 1.5;
   var busRow = box.querySelector(".swrow.bus");
   if(busRow){
@@ -1418,11 +1504,48 @@ function restorePick(){
   fillEta(el);
   etaFetch(el);       // 15 秒刷新过一轮，这一站的数也要重问
 
-  var rowH = el.offsetHeight || 42;
+  var rowH = el.offsetHeight || 46;
   var delta = el.getBoundingClientRect().top - box.getBoundingClientRect().top;
   var target = box.scrollTop + delta - box.clientHeight * 0.4;
   box.scrollTop = Math.max(0, Math.min(Math.round(target / rowH) * rowH,
                                        box.scrollHeight - box.clientHeight));
+}
+
+/* 卡片中间那块（大数字 / 状态文字）单独抽出来。
+   抽出来不是为了复用，是为了静默刷新时能只换这一块，不动下面的站点列表。 */
+function midInner(main, station){
+  var cls = main.dir==="1" ? "up" : "dn";
+  var urgent = (main.status==="coming" && main.minutes!==null && main.minutes<=3);
+  var s = "";
+  if(main.status==="noroute"){
+    s += '<div class="stxt '+cls+'" style="font-size:30px;line-height:1.25">不经过 '+esc(station)+'站</div>'
+       + '<div class="sub">下面是全程站点和车开到哪了</div>';
+  } else if(main.status==="here"){
+    s += '<div class="stxt '+cls+'">车在站上</div><div class="sub">快上车</div>';
+  } else if(main.status==="coming" && main.minutes!==null){
+    if(main.minutes===0){
+      s += '<div class="stxt '+cls+'">马上到</div><div class="sub"><b class="go">快上车</b>车就在附近</div>';
+    } else {
+      s += '<div class="main"><span class="min '+cls+'">'+main.minutes+'</span>'
+         + '<span class="unit '+cls+'">分钟</span></div>'
+         + '<div class="sub">'+(urgent?'<b class="go">该出门了</b> · ':'')
+         + '还有 <b>'+(main.stations!==null?main.stations+" 站":"几站")+'</b></div>';
+    }
+  } else if(main.status==="waiting"){
+    s += '<div class="stxt '+cls+'">等发车</div><div class="sub">'+esc(main.dist)+'</div>';
+  } else if(main.status==="closed"){
+    s += '<div class="stxt '+cls+'">已收班</div><div class="sub">明天再来</div>';
+  } else {
+    s += '<div class="stxt '+cls+'">'+esc(main.node||"暂无车")+'</div>';
+  }
+  return s;
+}
+
+/* 站点列表上方那句话。返回纯文本，调用方自己决定 esc() 还是 textContent */
+function aboveText(win){
+  return (win && win.busHere)
+    ? '车现在在 ' + win.busHere + ' · 点站点看多久到'
+    : '点站点看车多久到';
 }
 
 function homeCard(main, other, win, station){
@@ -1450,35 +1573,12 @@ function homeCard(main, other, win, station){
      + '<span class="toward">往 '+esc(main.toShort)+'</span>'
      + swapHtml + '</div>';
 
-  h += '<div class="cmid" role="img" aria-label="' + esc(ariaText(main, station)) + '">';
-  if(main.status==="noroute"){
-    h += '<div class="stxt '+cls+'" style="font-size:30px;line-height:1.25">不经过 '+esc(station)+'站</div>'
-       + '<div class="sub">下面是全程站点和车开到哪了</div>';
-  } else if(main.status==="here"){
-    h += '<div class="stxt '+cls+'">车在站上</div><div class="sub">快上车</div>';
-  } else if(main.status==="coming" && main.minutes!==null){
-    if(main.minutes===0){
-      h += '<div class="stxt '+cls+'">马上到</div><div class="sub"><b class="go">快上车</b>车就在附近</div>';
-    } else {
-      h += '<div class="main"><span class="min '+cls+'">'+main.minutes+'</span>'
-         + '<span class="unit '+cls+'">分钟</span></div>'
-         + '<div class="sub">'+(urgent?'<b class="go">该出门了</b> · ':'')
-         + '还有 <b>'+(main.stations!==null?main.stations+" 站":"几站")+'</b></div>';
-    }
-  } else if(main.status==="waiting"){
-    h += '<div class="stxt '+cls+'">等发车</div><div class="sub">'+esc(main.dist)+'</div>';
-  } else if(main.status==="closed"){
-    h += '<div class="stxt '+cls+'">已收班</div><div class="sub">明天再来</div>';
-  } else {
-    h += '<div class="stxt '+cls+'">'+esc(main.node||"暂无车")+'</div>';
-  }
-  h += '</div>';
+  h += '<div class="cmid" role="img" aria-label="' + esc(ariaText(main, station)) + '">'
+     + midInner(main, station) + '</div>';
 
     if(win && win.rows && win.rows.length){
     h += '<div class="swin">';
-    h += '<div class="swabove" id="swabove">'
-       + (win.busHere ? '车现在在 '+esc(win.busHere)+' · 点站点看多久到' : '点站点看车多久到')
-       + '</div>';
+    h += '<div class="swabove" id="swabove">' + esc(aboveText(win)) + '</div>';
     h += '<div class="swscroll" id="swscroll">';
     for(var wi = 0; wi < win.rows.length; wi++){
       var r = win.rows[wi];
@@ -1789,7 +1889,8 @@ function route(){
   if(parts[0] === "b"){
     var bl = decodeURIComponent(parts[1]||""), bd = parts[2]||"1", bs = params.st||"";
     viewBoard(bl, bd, bs);
-    timer = setInterval(function(){ viewBoard(bl, bd, bs); }, 15000);
+    // 第四个参数 true = 静默刷新：只贴数据，不重画整页
+    timer = setInterval(function(){ viewBoard(bl, bd, bs, true); }, 15000);
     return;
   }
   if(parts[0] === "d"){ viewDirs(decodeURIComponent(parts[1]||""), params.from || ""); return; }
