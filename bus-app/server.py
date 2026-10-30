@@ -45,6 +45,10 @@ ICON_THEMES = {
     "sky":  {"top": (152, 215, 247), "bot": (77, 167, 232),
              "body": (255, 255, 255), "glass": (17, 69, 106),
              "wheel": (17, 69, 106), "lamp": (255, 209, 102)},
+    # 暖阳：用户给的色卡（黄橙 → 橙 → 橙红）
+    "ember": {"top": (244, 176, 27), "bot": (237, 109, 65),
+              "body": (255, 255, 255), "glass": (74, 42, 24),
+              "wheel": (74, 42, 24), "lamp": (240, 129, 25)},
     # 深蓝：原来的观感，作为对照保留
     "deep": {"top": (24, 80, 128), "bot": (14, 58, 99),
              "body": (255, 255, 255), "glass": (14, 58, 99),
@@ -1850,8 +1854,10 @@ def page_html(skin="a", pwa=False):
     """
     css = SKINS.get(skin) or SKINS.get("a") or CSS
     # 图标与状态栏底色跟着皮肤走，别让暖橘页面顶着深蓝图标
-    theme = {"b": "#E9EAE4", "d": "#FFF8F1", "e": "#F6FAFF"}.get(skin, "#FAFAF7")
-    icon_v = {"c": "deep", "d": "warm", "e": "sky"}.get(skin, "warm")
+    theme = {"b": "#E9EAE4", "d": "#FFF8F1", "e": "#F6FAFF",
+             "f": "#FFFAF3"}.get(skin, "#FAFAF7")
+    icon_v = {"c": "deep", "d": "warm", "e": "sky",
+              "f": "ember"}.get(skin, "ember")
     head = ""
     if pwa:
         head = ("<link rel=\"manifest\" href=\"/manifest.json\">"
