@@ -753,9 +753,10 @@ V2_OVERRIDE = r"""
 .favbtn.on{color:#E8A008}
 
 /* ---- 附近站点：定位状态 + 范围三档 + 站点列表 ---- */
-.nearhead{display:flex;align-items:baseline;justify-content:space-between;
+.nearhead{display:flex;align-items:center;justify-content:space-between;
           padding:14px 16px 0}
-.nh{font-size:15.5px;font-weight:700;color:#1A1C1E}
+.nh{font-size:15.5px;font-weight:700;color:#1A1C1E;flex:1;min-width:0;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nstate{font-size:12.5px;color:#8A8F94}
 .ranges{display:flex;gap:8px;padding:10px 16px 4px;flex-wrap:wrap}
 .rg{
@@ -775,10 +776,59 @@ V2_OVERRIDE = r"""
 .nitm.sel .dst{color:#0B2743;font-weight:700}
 .nitm.sel .nd{color:#4A6B8F}
 .nearnone{padding:12px 16px 6px;font-size:14px;color:#8A8F94;line-height:1.65}
+
+/* ---- 附近站点区的收起 / 展开 ----
+   2 公里一档几十个站，全摊着的话滑到「这站有哪些车」要拨好几屏。
+   选定站以后整块收成一行摘要，线路直接顶上来。 */
+.nfold{
+  display:none;margin-left:10px;padding:7px 11px;border-radius:9px;
+  border:1px solid #E4E3DA;background:#fff;color:#5C6166;
+  font-size:13px;font-family:inherit;cursor:pointer;flex:0 0 auto;
+  transition:transform .12s ease;
+}
+.nfold.on{display:inline-block}
+.nfold:active,.nfold.down{transform:scale(.95)}
+
+.nearcur{
+  display:none;width:100%;align-items:center;gap:10px;
+  padding:16px 16px;border:0;background:none;font-family:inherit;
+  text-align:left;cursor:pointer;
+  animation:nearIn .16s ease both;
+}
+.nearcur.on{display:flex}
+.nearcur .nc{
+  flex:1;min-width:0;font-size:19px;font-weight:700;color:#0B2743;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.nearcur .nd{
+  font-size:14px;color:#8A8F94;flex-shrink:0;
+  font-variant-numeric:tabular-nums;
+}
+.nearcur .nsw{
+  font-size:15.5px;font-weight:600;color:#0B2743;flex-shrink:0;
+  padding-left:6px;letter-spacing:-.2px;
+}
+.nearcur:active{background:#F3F4EE}
+.nearcur.down{background:#F3F4EE}
+
+/* 收起来的时候，标题、范围、列表一起藏 —— 只留上面那行摘要 */
+#nearzone.nearfold .nearhead,
+#nearzone.nearfold .ranges,
+#nearzone.nearfold #nlist{display:none}
+
+/* 折叠状态下点一个站会滚到「有车的在前」，留出上面那行摘要的高度，
+   否则「换个站」被顶出视野，想换回来还得往上拨 */
+#nearzone.nearfold + .nearcur + .curhead{scroll-margin-top:58px}
+
+@keyframes nearIn{
+  from{opacity:0;transform:translateY(-4px)}
+  to{opacity:1;transform:none}
+}
 /* 「这站有哪些车」的分段标题：要比 .sec 那层灰字重，
    否则整页会糊成一张长列表，老人分不清哪是站、哪是车 */
 .curhead{
   margin:8px 16px 0;padding:18px 0 8px;border-top:1px solid #EFEEE8;
+  scroll-margin-top:6px;
   font-size:16px;font-weight:700;color:#1A1C1E;letter-spacing:-.2px;
 }
 

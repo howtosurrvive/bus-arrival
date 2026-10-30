@@ -1377,7 +1377,8 @@ function stationRows(lines, station, limit){
       会因为「不是安全来源」直接拒绝 navigator.geolocation；
    ② 浏览器 geolocation（https 或 localhost 才给）。
    两个都失败就退回上次用的站，绝不编一个坐标出来。 */
-var _near = { lat: null, lon: null, r: 800, list: [], cur: "" };
+var _near = { lat: null, lon: null, r: 800, list: [], cur: "",
+              fold: false, lstName: "", picked: false };
 
 function nearR(){
   var v = parseInt(ls("nearR") || "800", 10);
@@ -1547,6 +1548,7 @@ function renderNear(msg){
        + '</div>';
   }
   box.innerHTML = h;
+  paintNearSlim();
 }
 
 function fetchNearby(){
@@ -1559,19 +1561,82 @@ function fetchNearby(){
     _near.list = p.stations || [];
     renderNear("");
     // 第一次来就选最近的那个；已经选过站就别动她的选择
-    if(!_near.cur && _near.list.length) pickStation(_near.list[0].name);
-    else markNear();
+    if(!_near.picked && _near.list.length) pickStation(_near.list[0].name, false);
+    else { markNear(); paintNearSlim(); }
   })
   .catch(function(){ renderNear("连不上，附近站点查不了"); });
 }
 
 /* 选中一个站：高亮它，再把下半部分换成这站的线路 */
-function pickStation(name){
+function pickStation(name, byUser){
   if(!name) return;
   _near.cur = name;
-  ls("homeStation", name);
+  if(byUser){ ls("homeStation", name); _near.picked = true; }
   markNear();
   loadStation(name);
+  // 用户自己点的站才收起列表 —— 第一次进来自动选最近站时不收，
+  // 让她先看见附近有哪些站，知道这页是干什么的
+  if(byUser){
+    foldNear(true);
+    var sec = document.getElementById("cursec");
+    if(sec && sec.scrollIntoView){ try{ sec.scrollIntoView({block:"start"}); }catch(e){} }
+  } else {
+    // 自动选站：保持展开，但「收起」按钮这会儿该出现了（原来没有站可选，收了没得选）
+    foldNear(_near.fold);
+    paintNearSlim();
+  }
+}
+
+/* ---- 附近站点的折叠 ----
+   2 公里一档能列出几十个站，全摊在页面上，滑到「这站有哪些车」要拨好几屏。
+   选定站以后就把整块收成一行摘要，线路直接顶上来。
+   收起来的前提是「已经选好了一个站」—— 一个都没选时不许收，否则没得选。 */
+function foldNear(on){
+  var z = document.getElementById("nearzone");
+  var b = document.getElementById("nearcur");
+  var f = document.getElementById("nfold");
+  if(!z || !b) return;
+  if(on && !_near.cur) on = false;
+  _near.fold = on;
+  z.className = on ? "nearfold" : "";
+  b.className = "nearcur" + (on ? " on" : "");
+  if(f) f.className = "nfold" + (!on && _near.cur ? " on" : "");
+  if(on) paintNearSlim();
+  paintCurHead();
+}
+
+/* 折叠条上写：站名 · 距离 · 换个站 */
+function paintNearSlim(){
+  var b = document.getElementById("nearcur");
+  if(!b) return;
+  // 「收起」按钮和折叠条是一体的两面：选了站才谈得上收起。
+  // 放在这里同步，凡是改了 _near.cur 的地方（自动选站、后端兜底、用户点选）
+  // 只要调过 paintNearSlim，按钮就不会漏更新。
+  var f = document.getElementById("nfold");
+  if(f) f.className = "nfold" + (!_near.fold && _near.cur ? " on" : "");
+  var name = _near.cur || "";
+  var d = null;
+  for(var i = 0; i < _near.list.length; i++){
+    if(_near.list[i].name === name){ d = _near.list[i].dist; break; }
+  }
+  b.innerHTML = '<span class="nc">' + esc(name) + '</span>'
+    + '<span class="nd">' + (d == null ? (name ? "常去" : "") : fmtDist(d)) + '</span>'
+    + '<span class="nsw">换个站 ›</span>';
+}
+
+/* 「XX站 · 有车的在前」—— 折叠时站名已经在上面那行了，别再说一遍 */
+function stTitle(n){
+  n = n || "";
+  if(n.indexOf("站") >= 0 || /[）)]$/.test(n)) return n;
+  return n + "站";
+}
+
+function paintCurHead(){
+  var sec = document.getElementById("cursec");
+  if(!sec) return;
+  var n = _near.lstName || _near.cur;
+  if(!n) return;
+  sec.textContent = (_near.fold ? "" : stTitle(n) + " · ") + "有车的在前";
 }
 
 /* 拉某个站有哪些车。name 为空时后端退回默认站 */
@@ -1582,12 +1647,12 @@ function loadStation(name){
   api("/api/home?station=" + encodeURIComponent(name || ""))
   .then(function(p){
     if(!p.ok){ el.innerHTML = errBox("查不到", p.error); return; }
-    var sec = document.getElementById("cursec");
-    if(sec) sec.textContent = p.station + "站 · 有车的在前";
+    _near.lstName = p.station;
+    paintCurHead();
     var ck = document.getElementById("clock");
     if(ck) ck.innerHTML = '<i class="live"></i>' + p.updated;
 
-    if(!_near.cur){ _near.cur = p.station; markNear(); }
+    if(!_near.cur){ _near.cur = p.station; markNear(); paintNearSlim(); }
 
     var lines = p.lines || [];
     if(!lines.length){
@@ -1606,6 +1671,7 @@ function viewHome(){
   var el = document.getElementById("app");
   _near.r = nearR();
   _near.cur = ls("homeStation") || "";
+  _near.picked = !!_near.cur;      // 用户自己选过的站才算，后端兜底的默认站不算
   _near.list = [];
 
   el.innerHTML = '<div class="nav"><span class="t">附近站牌</span>'
@@ -1617,13 +1683,22 @@ function viewHome(){
     + 'onkeydown="if(event.key===\'Enter\'){event.preventDefault();homeSearch();}">'
     + '<button class="sbtn" onclick="homeSearch()">搜</button></div>'
     + '<div class="scroll flush">'
+    + '<div id="nearzone">'
     + '<div class="nearhead"><span class="nh" id="nhtitle">附近的站</span>'
-    + '<span class="nstate" id="locstate">正在定位…</span></div>'
+    + '<span class="nstate" id="locstate">正在定位…</span>'
+    + '<button class="nfold" id="nfold" onclick="foldNear(true)">收起</button></div>'
     + '<div class="ranges">' + rangeBtns() + '</div>'
     + '<div id="nlist"><div class="loading" style="padding:16px">正在定位…</div></div>'
+    + '</div>'
+    + '<button class="nearcur" id="nearcur" onclick="foldNear(false)"></button>'
     + '<div class="curhead" id="cursec">这站有哪些车</div>'
     + '<div id="lst"></div>'
     + '</div>';
+
+  // 上次看过哪个站，这次就直接从那站开始，并且把附近列表收起来 ——
+  // 老人开机只想看车，不想先滑过一屏站名
+  _near.lstName = "";
+  foldNear(_near.picked);
 
   // 先把「这站有哪些车」显示出来 —— 定位可能要等几秒，不能让她对着空页面等
   loadStation(_near.cur);
