@@ -1116,6 +1116,20 @@ function syncWatch(){
 }
 
 function go(hash){
+  // 点的是列表里的一行/一张卡：先亮 90ms 再跳。
+  // 老人判断「点了没有」靠的是眼前有没有动，不是靠下一页出没出来 ——
+  // 网络慢的时候，没有这一下他会以为没点中，接着连点三下。
+  var t = window._lastTap;
+  window._lastTap = null;
+  var isCard = t && t.classList && (t.classList.contains("row") || t.classList.contains("dircard"));
+  if(isCard){
+    t.classList.add("tapped");
+    setTimeout(function(){
+      t.classList.remove("tapped");
+      if(location.hash === hash){ route(); } else { location.hash = hash; }
+    }, 90);
+    return;
+  }
   if(location.hash === hash){ route(); } else { location.hash = hash; }
 }
 
@@ -1942,22 +1956,31 @@ route();
   function clear(){
     if(cur){ cur.classList.remove("down"); cur = null; }
   }
-  var HIT = {btn:1, opt:1, th:1, row:1, swall:1};
+  // 按下过、还没跳转的那个元素。给 go() 用：先给它亮一下，让「点中了」被看见。
+  function mark(t){
+    window._lastTap = t;
+    // 按下却没产生点击（拖走、被别的元素吃掉）时别留残影，900ms 后自己作废
+    setTimeout(function(){ if(window._lastTap === t) window._lastTap = null; }, 900);
+  }
   document.addEventListener("pointerdown", function(e){
     var t = e.target;
     while(t && t !== document.body){
       var c = t.classList;
       if(c && (c.contains("btn") || c.contains("opt") || c.contains("th")
-            || c.contains("row") || c.contains("swall"))){
-        clear(); cur = t; t.classList.add("down"); break;
+            || c.contains("row") || c.contains("dircard") || c.contains("swall"))){
+        clear(); cur = t; t.classList.add("down"); mark(t); break;
       }
       t = t.parentNode;
     }
   }, {passive:true});
-  ["pointerup", "pointercancel"].forEach(function(ev){
-    document.addEventListener(ev, clear, {passive:true});
-  });
-  document.addEventListener("scroll", clear, {passive:true, capture:true});
+  // 抬手只去掉按下态，_lastTap 要留到随后的 click —— go() 靠它找到被点的行
+  document.addEventListener("pointerup", clear, {passive:true});
+  document.addEventListener("pointercancel", function(){
+    clear(); window._lastTap = null;
+  }, {passive:true});
+  document.addEventListener("scroll", function(){
+    clear(); window._lastTap = null;
+  }, {passive:true, capture:true});
 })();
 
 

@@ -729,6 +729,37 @@ V2_OVERRIDE = r"""
 .row:active,.row.down{background:#F1F1EA}
 .swall:active,.swall.down{opacity:.55}
 
+/* ---- 选线与列表：点得准，也看得出点中了 ----
+   原来只有 :active 换个底色，桌面上鼠标移过去毫无反应，手机上按下去
+   也只是一闪。这里补三件事：桌面悬停、按下位移、点击后先确认再跳。 ---- */
+.row,.dircard{
+  transition:background .12s ease, border-color .12s ease,
+             box-shadow .12s ease, transform .12s ease;
+}
+.row .arrow{transition:transform .14s ease, color .14s ease}
+
+@media (hover:hover) and (pointer:fine){
+  .row:hover{background:#F7F7F1}
+  .row:hover .arrow{transform:translateX(3px);color:#0E3A63}
+  .dircard:hover{background:#FCFCF8;border-color:#DDDCD2;
+                 box-shadow:0 6px 18px -12px rgba(22,32,43,.45)}
+  .dircard:hover::after{color:#0E3A63;transform:translateY(-50%) translateX(3px)}
+}
+
+.row:active,.row.down{background:#EDEDE3;transform:scale(.994)}
+.dircard:active,.dircard.down{background:#F5F5EE;transform:scale(.995)}
+/* 点下去到跳转之间那 90ms，给个明确回答：这一下算数 */
+.row.tapped{background:#E6ECF4}
+.dircard.tapped{background:#EAF0F7;border-color:#C9D6E6}
+
+/* 换页的进入动画。静默刷新不重建 DOM，所以它只在新页面出现时放一次，
+   不会每 15 秒闪一下。滚动容器只淡入不位移 —— 带 transform 的滚动容器
+   在部分安卓 WebView 上会滚不顺。 */
+#app>.nav,#app>.btnrow{animation:appInY .16s ease-out both}
+#app>.scroll{animation:appInO .16s ease-out both}
+@keyframes appInY{from{opacity:.5;transform:translateY(5px)}to{opacity:1;transform:none}}
+@keyframes appInO{from{opacity:.55}to{opacity:1}}
+
 /* ---- 无障碍：尊重系统的「减少动态效果」 ---- */
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.01ms !important;transition-duration:.01ms !important}
