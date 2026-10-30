@@ -729,6 +729,21 @@ V2_OVERRIDE = r"""
 .row:active,.row.down{background:#F1F1EA}
 .swall:active,.swall.down{opacity:.55}
 
+/* ---- 收藏星标：列表里一行一个，站牌页标题旁边一个 ---- */
+.favtog{
+  flex:0 0 auto;width:34px;height:34px;margin-left:2px;padding:0;
+  border:0;border-radius:9px;background:transparent;cursor:pointer;
+  font-size:18px;line-height:1;color:#C9CCC2;font-family:inherit;
+  transition:transform .12s ease, color .12s ease;
+}
+.favtog.on{color:#E8A008}
+.favtog:active,.favtog.down{transform:scale(.88)}
+.favbtn{
+  border:0;background:transparent;cursor:pointer;font-family:inherit;
+  font-size:19px;line-height:1;color:#C9CCC2;padding:0 7px;
+}
+.favbtn.on{color:#E8A008}
+
 /* ---- 附近站点：定位状态 + 范围三档 + 站点列表 ---- */
 .nearhead{display:flex;align-items:baseline;justify-content:space-between;
           padding:14px 16px 0}

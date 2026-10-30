@@ -335,6 +335,15 @@ def fetch_platforms(station):
             out.append({"lat": float(x.get("lat")), "lon": float(x.get("lon"))})
         except (TypeError, ValueError):
             continue
+    # 顺手入库：收藏一个站的时候靠这里把坐标补上，
+    # 否则「常去的站」永远算不出距离
+    if out:
+        changed = False
+        for p in out:
+            if station_db_put(station, p["lat"], p["lon"]):
+                changed = True
+        if changed:
+            station_db_flush()
     return out
 
 
@@ -404,17 +413,30 @@ def _dist_m(lat1, lon1, lat2, lon2):
     return 2 * R * math.asin(min(1.0, math.sqrt(a)))
 
 
-def build_nearby(lat, lon, radius=500, limit=15):
+def build_nearby(lat, lon, radius=500, limit=30, faves=None):
+    """半径内的站 + 收藏的站。
+
+    收藏的站**不受半径限制** —— 这是故意的：老人真正要坐的就是那两三个站，
+    走远一点也还是它。而且家里信号差、定位偏，半径算进来算不进来都不可靠。
+    """
     db = station_db()
-    hits = []
-    for name, pts in db.items():
+    out = {}
+    for name in (faves or []):
+        pts = db.get(name)
         if not pts:
+            continue                     # 站库里还没有它，跳过（不能编坐标）
+        d = min(_dist_m(lat, lon, p[0], p[1]) for p in pts)
+        out[name] = {"name": name, "dist": int(round(d)), "fave": True}
+
+    for name, pts in db.items():
+        if name in out or not pts:
             continue
         d = min(_dist_m(lat, lon, p[0], p[1]) for p in pts)
         if d <= radius:
-            hits.append({"name": name, "dist": int(round(d))})
-    hits.sort(key=lambda x: (x["dist"], x["name"]))
-    return {"ok": True, "stations": hits[:limit], "total": len(hits),
+            out[name] = {"name": name, "dist": int(round(d)), "fave": False}
+
+    items = sorted(out.values(), key=lambda x: (0 if x["fave"] else 1, x["dist"], x["name"]))
+    return {"ok": True, "stations": items[:limit], "total": len(items),
             "radius": radius, "known": len(db)}
 
 
@@ -1357,6 +1379,44 @@ function fmtDist(m){
   return m < 1000 ? (m + " 米") : ((m / 1000).toFixed(1) + " 公里");
 }
 
+/* ---- 常去的站 ---------------------------------------------------------
+   收藏存在手机上（localStorage），服务端不记 —— 这是她这台手机的偏好。
+   收藏的站不受半径限制：老人真正要坐的就那两三个站，走远一点也还是它。
+   家里定位常偏，半径算不算得进来本来就不可靠，靠收藏兜底更实在。 */
+function faves(){
+  try{
+    var a = JSON.parse(ls("faves") || "[]");
+    return (a && a.length !== undefined) ? a : [];
+  }catch(e){ return []; }
+}
+
+function isFave(n){ return faves().indexOf(n) >= 0; }
+
+function toggleFave(n){
+  if(!n) return;
+  var a = faves(), i = a.indexOf(n);
+  if(i >= 0) a.splice(i, 1); else a.push(n);
+  ls("faves", JSON.stringify(a));
+  renderNear("");
+  var fb = document.getElementById("favbtn");
+  if(fb) setFavBtn(fb, n);
+
+  // 刚收藏的站如果站库里还没有坐标，顺手补一次 —— 不然永远显示「常去」没有距离。
+  // 失败也无所谓：收藏本身就生效了，下次定位时再补。
+  if(i < 0 && _near.lat !== null){
+    api("/api/stloc?name=" + encodeURIComponent(n)).then(function(p){
+      if(p && p.ok) fetchNearby();
+    }).catch(function(){});
+  }
+}
+
+function setFavBtn(b, name){
+  var on = isFave(name);
+  b.textContent = on ? "★" : "☆";
+  b.className = "favbtn" + (on ? " on" : "");
+  b.setAttribute("aria-label", on ? "取消收藏" : "收藏这个站");
+}
+
 function markNear(){
   var box = document.getElementById("nlist");
   if(!box) return;
@@ -1370,19 +1430,42 @@ function markNear(){
 function renderNear(msg){
   var box = document.getElementById("nlist");
   if(!box) return;
-  if(!_near.list.length){
-    box.innerHTML = '<div class="nearnone">' + esc(msg || "这个范围里没有站，把范围放大一点") + '</div>';
+
+  var fav = faves();
+  var distOf = {};
+  for(var i = 0; i < _near.list.length; i++) distOf[_near.list[i].name] = _near.list[i].dist;
+
+  var rows = [], k;
+  // 收藏的站先出：没有定位、超出范围，也照样在
+  for(k = 0; k < fav.length; k++){
+    rows.push({name: fav[k], dist: (distOf.hasOwnProperty(fav[k]) ? distOf[fav[k]] : null)});
+  }
+  for(k = 0; k < _near.list.length; k++){
+    var it = _near.list[k];
+    if(fav.indexOf(it.name) >= 0) continue;      // 已经在上面的收藏里了
+    rows.push({name: it.name, dist: it.dist});
+  }
+
+  if(!rows.length){
+    box.innerHTML = '<div class="nearnone">'
+      + esc(msg || "这个范围里没有站，把范围放大一点") + '</div>';
     return;
   }
+
   var h = "";
-  for(var i = 0; i < _near.list.length; i++){
-    var s = _near.list[i];
-    h += '<div class="row nitm' + (s.name === _near.cur ? " sel" : "") + '" '
-       + 'data-st="' + esc(s.name) + '" '
+  for(k = 0; k < rows.length; k++){
+    var r = rows[k], on = r.name === _near.cur, star = isFave(r.name);
+    h += '<div class="row nitm' + (on ? " sel" : "") + '" '
+       + 'data-st="' + esc(r.name) + '" '
        + 'onclick="pickStation(this.getAttribute(\'data-st\'))">'
-       + '<span class="dst">' + esc(s.name) + '</span>'
-       + '<span class="nd">' + fmtDist(s.dist) + '</span>'
-       + '<span class="arrow">›</span></div>';
+       + '<span class="dst">' + esc(r.name) + '</span>'
+       + '<span class="nd">' + (r.dist === null ? "常去" : fmtDist(r.dist)) + '</span>'
+       + '<button class="favtog' + (star ? " on" : "") + '" '
+       + 'data-st="' + esc(r.name) + '" '
+       + 'onclick="event.stopPropagation();toggleFave(this.getAttribute(\'data-st\'))" '
+       + 'aria-label="' + (star ? "取消收藏" : "收藏这个站") + '">'
+       + (star ? "★" : "☆") + '</button>'
+       + '</div>';
   }
   box.innerHTML = h;
 }
@@ -1390,7 +1473,8 @@ function renderNear(msg){
 function fetchNearby(){
   var box = document.getElementById("nlist");
   if(box) box.innerHTML = '<div class="loading" style="padding:16px">正在找附近的站…</div>';
-  api("/api/nearby?lat=" + _near.lat + "&lon=" + _near.lon + "&r=" + _near.r)
+  api("/api/nearby?lat=" + _near.lat + "&lon=" + _near.lon + "&r=" + _near.r
+    + "&faves=" + encodeURIComponent(faves().join(",")))
   .then(function(p){
     if(!p.ok){ renderNear("查不到附近站点"); return; }
     _near.list = p.stations || [];
@@ -1454,7 +1538,7 @@ function viewHome(){
     + 'onkeydown="if(event.key===\'Enter\'){event.preventDefault();homeSearch();}">'
     + '<button class="sbtn" onclick="homeSearch()">搜</button></div>'
     + '<div class="scroll flush">'
-    + '<div class="nearhead"><span class="nh">附近的站</span>'
+    + '<div class="nearhead"><span class="nh" id="nhtitle">附近的站</span>'
     + '<span class="nstate" id="locstate">正在定位…</span></div>'
     + '<div class="ranges">' + rangeBtns() + '</div>'
     + '<div id="nlist"><div class="loading" style="padding:16px">正在定位…</div></div>'
@@ -1469,9 +1553,15 @@ function viewHome(){
     var st = document.getElementById("locstate");
     if(!pos){
       if(st) st.textContent = "拿不到位置";
-      renderNear("拿不到位置。下面是上次看的站；想换站，用上面的搜索框搜站名");
+      // 没定位就只显示常去的站 —— 这时候「附近的站」这个标题是假话
+      var t = document.getElementById("nhtitle");
+      if(t) t.textContent = "常去的站";
+      renderNear("还没有常去的站。用上面的搜索框搜站名，进到那站以后点 ☆ 就能存下来，"
+               + "以后不用管定位");
       return;
     }
+    var t2 = document.getElementById("nhtitle");
+    if(t2) t2.textContent = "附近的站";
     _near.lat = pos.lat;
     _near.lon = pos.lon;
     if(st) st.textContent = "已定位";
@@ -1953,6 +2043,8 @@ function viewStation(name){
     var LIMIT = 6;
     var html = '<div class="nav"><button class="back" onclick="back()">‹ 返回</button>'
              + '<span class="t">'+esc(p.station)+'</span>'
+             + '<button class="favbtn" id="favbtn" data-st="'+esc(p.station)+'" '
+             + 'onclick="toggleFave(this.getAttribute(\'data-st\'))">☆</button>'
              + '<button class="navlink" onclick="go(\'#/search\')">换站 ›</button></div>';
 
     html += '<div class="scroll flush"><div class="sec" style="padding:12px 16px 6px">'
@@ -1964,6 +2056,8 @@ function viewStation(name){
     }
     html += '<div class="tip">更新于 '+p.updated+'</div></div>';
     el.innerHTML = html;
+    var fb = document.getElementById("favbtn");
+    if(fb) setFavBtn(fb, p.station);
   }).catch(function(){ el.innerHTML = errBox("连不上", "稍后再试"); });
 }
 
@@ -2257,7 +2351,7 @@ route();
       var c = t.classList;
       if(c && (c.contains("btn") || c.contains("opt") || c.contains("th")
             || c.contains("row") || c.contains("dircard") || c.contains("swall")
-            || c.contains("rg"))){
+            || c.contains("rg") || c.contains("favtog") || c.contains("favbtn"))){
         clear(); cur = t; t.classList.add("down"); mark(t); break;
       }
       t = t.parentNode;
@@ -2476,6 +2570,19 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     self._json(build_board(line, d, station))
 
+            elif path == "/api/stloc":
+                # 收藏一个站时调一次，把它的坐标补进站库。查不到就老实回 false。
+                nm = (q.get("name") or [""])[0].strip()
+                if not nm:
+                    self._json({"ok": False, "error": "没给站名"})
+                    return
+                try:
+                    pts = fetch_platforms(nm)
+                except Exception as e:
+                    self._json({"ok": False, "error": str(e)})
+                    return
+                self._json({"ok": bool(pts), "name": nm, "points": len(pts)})
+
             elif path == "/api/nearby":
                 # 附近站点：前端把定位坐标传上来，本地站库算距离再筛。
                 # 拿不到定位就不编一个坐标 —— 宁可回错，让页面说「定位不了」。
@@ -2489,7 +2596,14 @@ class Handler(BaseHTTPRequestHandler):
                     rad = int((q.get("r") or ["500"])[0])
                 except ValueError:
                     rad = 500
-                self._json(build_nearby(lat, lon, max(100, min(3000, rad))))
+                # 收藏的站名由前端带上来（存在手机上，服务端不记）
+                faves = []
+                for raw in (q.get("faves") or [""])[0].split(","):
+                    n = raw.strip()
+                    if n and n not in faves:
+                        faves.append(n)
+                self._json(build_nearby(lat, lon, max(100, min(3000, rad)),
+                                        faves=faves))
 
             elif path == "/api/station":
                 name = (q.get("name") or [""])[0].strip()
