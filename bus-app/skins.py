@@ -625,6 +625,29 @@ V2_OVERRIDE = r"""
   background:#C7CCBE;flex-shrink:0;
 }
 
+/* ---- 点站点看车多久到：选中行 + 顶部就地变成估算条 ---- */
+.swrow{cursor:pointer}
+.swrow[data-sel="1"]{background:#E8F0F7;border-radius:9px}
+.swrow[data-sel="1"] .n{color:#0B4F8A;font-weight:700}
+.swrow[data-sel="1"] .d{border-color:#0B4F8A}
+.swabove.hot{
+  display:flex;align-items:center;gap:7px;flex-wrap:wrap;
+  background:#0E3A63;color:#fff;border-radius:11px;
+  padding:9px 11px;margin:0 0 9px;font-size:14px;line-height:1.35;
+}
+.swabove.hot::before{display:none}
+.swabove.hot .to{
+  flex:1;min-width:0;font-weight:700;font-size:14.5px;color:#fff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.swabove.hot .t{font-size:16px;font-weight:700;color:#fff;flex-shrink:0}
+.swabove.hot .x{color:rgba(255,255,255,.74);font-size:12.5px;flex-shrink:0}
+.swabove.hot .bx{
+  margin-left:auto;width:26px;height:26px;flex-shrink:0;padding:0;
+  background:rgba(255,255,255,.18);border:0;border-radius:50%;
+  color:#fff;font-size:16px;line-height:1;
+}
+
 /* ---- 交互：换方向更像按钮，不再像标签 ---- */
 .swapbtn{
   border-color:#D5DAE1;color:#2F353C;

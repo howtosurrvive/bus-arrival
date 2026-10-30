@@ -14,3 +14,4 @@ android/gen/
 # 本地签名文件不要进仓库（在 D:\dev\busapp.keystore）
 *.keystore
 *.jks
+.shots/

@@ -284,11 +284,58 @@ def fetch_platforms(station):
 # ---------------------------------------------------------------- 业务层
 
 
-def window_stops(detail):
+def _pace(main):
+    """每站大约几分钟。
+
+    只用最近一班车到我这站的实测均速（minutes / stations）反推，
+    不拿首末班时间硬除 —— 那是运营时段，不是全程耗时。
+    拿不到就返回 None，宁可不给分钟数，也不编一个。
+    """
+    try:
+        m, n = main.get("minutes"), main.get("stations")
+        if m is not None and n:
+            v = float(m) / float(n)
+            return min(6.0, max(1.0, v))
+    except (AttributeError, TypeError, ValueError, ZeroDivisionError):
+        pass
+    return None
+
+
+def _eta_for(i, detail, main, pace):
+    """车到第 i 站还要几站、约几分钟。
+
+    index 是「正在驶向的站序」，所以 index <= i 的车都还没开过这站；
+    取其中最靠前的一辆，和卡片上那个大数字是同一班车。
+    """
+    focus = detail.get("focus")
+    buses = detail.get("buses") or []
+
+    live = [b for b in buses if b["index"] <= i]
+    if not live:
+        return None, None, True          # 车已经开过去了，等下一班
+
+    bus = max(live, key=lambda b: b["index"])
+    left = i - bus["index"] + 1
+
+    # 就是我这站：必须和卡片主数字同一个来源，同一个站不能给出两个答案
+    if focus is not None and i == focus and main:
+        if main.get("stations") is not None:
+            left = main["stations"]
+        if main.get("minutes") is not None:
+            return main["minutes"], left, False
+
+    if pace is None:
+        return None, left, False         # 没有实时均速就不给分钟
+    return int(round(pace * left)), left, False
+
+
+def window_stops(detail, main=None):
     """首页/卡片用的站点列表：整条线全给，由前端在固定高度的框里滚动。
 
     detail["focus"] 为 None 时表示这条线不经过我的站 —— 这时候不能把第 1 站
     当成「你在这」，只把在途车辆的位置标出来。
+
+    每行顺带给出「车到这一站还有几站、约几分钟」，供前端点选查看。
     """
     stops = detail["stops"]
     focus = detail.get("focus")
@@ -300,9 +347,15 @@ def window_stops(detail):
         if focus is None or b["index"] < focus:
             bus_at.setdefault(b["index"], b)
 
-    rows = [{"i": s["i"], "name": s["name"],
-             "mine": focus is not None and s["i"] == focus,
-             "bus": s["i"] in bus_at} for s in stops]
+    pace = _pace(main)
+
+    rows = []
+    for s in stops:
+        eta, left, passed = _eta_for(s["i"], detail, main, pace)
+        rows.append({"i": s["i"], "name": s["name"],
+                     "mine": focus is not None and s["i"] == focus,
+                     "bus": s["i"] in bus_at,
+                     "eta": eta, "left": left, "passed": passed})
 
     # 最近一辆车停在哪一站，顶部一句话说清楚
     bus_here = None
@@ -314,7 +367,8 @@ def window_stops(detail):
                 break
 
     return {"rows": rows, "busHere": bus_here,
-            "total": len(stops), "focus": focus}
+            "total": len(stops), "focus": focus,
+            "pace": None if pace is None else round(pace, 1)}
 
 
 def build_home():
@@ -347,7 +401,7 @@ def build_board(line, d, station):
     other = next((v for v in mine if v["dir"] != d), None)
 
     det = build_line(line, d, station)
-    win = window_stops(det)
+    win = window_stops(det, main)
     passes = bool(det.get("focus"))
 
     # 反方向在这个站没有记录（比如环线）时，单独查一次拿终点名
@@ -451,6 +505,34 @@ def build_line(line, d, focus):
 
 def build_platforms(station):
     return {"ok": True, "station": station, "platforms": fetch_platforms(station)}
+
+
+def build_eta(line, d, station):
+    """车到某个指定站还要几站、几分钟。
+
+    不走「按站数乘平均时长」的推算，而是直接问上游这一站的实时到站 ——
+    和卡片上那个大数字是同一个来源，所以同一个站不会给出两个答案。
+    选任意站都成立，不依赖「我的站」，线路不经过家门口也一样能用。
+    """
+    station = (station or "").strip()
+    if not station:
+        return {"ok": False, "error": "缺少站名"}
+
+    try:
+        entries = fetch_station_lines(station)
+    except Exception:
+        return {"ok": False, "error": "这一站暂时查不到"}
+
+    for v in entries:
+        if v["line"] == line and v["dir"] == d:
+            return {"ok": True, "station": station, "line": line, "dir": d,
+                    "status": v["status"], "minutes": v["minutes"],
+                    "stations": v["stations"], "toShort": v["toShort"],
+                    "node": v["node"], "dist": v["dist"],
+                    "updated": datetime.now().strftime("%H:%M")}
+
+    # 车已经开过这一站，或这条线今天不再经过这里
+    return {"ok": False, "error": "这站没有这趟车"}
 
 
 SEARCH_MAX_LINES = 10     # 搜「5」会返回 77 条，全列出来老人只会退出去
@@ -1036,6 +1118,8 @@ function homeSearch(){
 /* 到站卡片：一条线一个方向，就是原来首页那张卡，现在可以装任意线路 */
 function viewBoard(line, dir, station){
   var el = document.getElementById("app");
+  // 换了线路或方向，上一次选中的站就不作数了；同一条线刷新则保留
+  if(_picked && _picked.key !== (line + "/" + dir)) _picked = null;
   el.innerHTML = '<div class="loading">正在查车…</div>';
   api("/api/board?line=" + encodeURIComponent(line)
     + "&dir=" + encodeURIComponent(dir)
@@ -1056,6 +1140,7 @@ function viewBoard(line, dir, station){
     el.innerHTML = html;
 
     centerMyStop();
+    restorePick();
     window._speech = mainSpeech(p.main, p.other);
     if(speakOn) speak(window._speech);
     _watch = {line: line, dir: dir, station: p.station};
@@ -1130,6 +1215,146 @@ function mainSpeech(main, other){
   return t;
 }
 
+/* ---------------------------------------------- 点站点，看车多久到
+   只改显示：不发请求、不动主数字、不新增块 —— 顶部「车现在在 X」那行就地变成估算，
+   列表高度不变，所以不会跳。老人误触也就是多出一行，点 × 就回去了。 */
+var _picked = null;      // {i, line, dir}：卡片每 15 秒重画一次，选中要能活过刷新
+
+function pickStop(el){
+  if(!el) return;
+  var box = document.getElementById("swscroll");
+  if(!box) return;
+
+  var on = el.getAttribute("data-sel") === "1";
+  var rows = box.querySelectorAll(".swrow");
+  for(var i = 0; i < rows.length; i++){
+    rows[i].removeAttribute("data-sel");
+    rows[i].className = rows[i].className.replace(" sel", "");
+  }
+  if(on){ _picked = null; fillEta(null); return; }    // 再点一次就取消
+
+  var r = rowOf(el);
+  if(!r) return;
+  _picked = {i: r.i, key: window._winKey || ""};
+  el.setAttribute("data-sel", "1");
+  el.className += " sel";
+  fillEta(el);        // 先用本地算的，立刻有数
+  etaFetch(el);       // 再问一次这一站，用真实到站覆盖
+}
+
+/* 问上游这一站的实时到站。点得快时只认最后一次，旧响应直接丢掉 */
+var _etaSeq = 0;
+
+function etaFetch(el){
+  var r = rowOf(el);
+  if(!r || !window._winKey) return;
+  if(r.mine) return;                       // 就是我这站，主数字已经准了
+  if(window.__DATA__) return;              // 离线演示页没有接口，用本地估算就够了
+  var parts = window._winKey.split("/");
+  var seq = ++_etaSeq;
+
+  api("/api/eta?line=" + encodeURIComponent(parts[0])
+      + "&dir=" + encodeURIComponent(parts[1])
+      + "&station=" + encodeURIComponent(r.name))
+  .then(function(p){
+    if(seq !== _etaSeq) return;            // 已经点了别的站
+    if(!p || !p.ok){
+      r.status = "noroute";
+      if(el.getAttribute("data-sel") === "1") fillEta(el);
+      return;
+    }
+    r.status = p.status;
+    r.eta = p.minutes;
+    r.left = p.stations;
+    r.passed = (p.status === "passed");
+    if(el.getAttribute("data-sel") === "1") fillEta(el);
+  })
+  .catch(function(){});
+}
+
+function rowOf(el){
+  var i = parseInt(el.getAttribute("data-i"), 10);
+  var rows = (window._win && window._win.rows) || [];
+  for(var k = 0; k < rows.length; k++){
+    if(rows[k].i === i) return rows[k];
+  }
+  return null;
+}
+
+function fillEta(el){
+  var bar = document.getElementById("swabove");
+  if(!bar) return;
+
+  if(!el){
+    bar.className = "swabove";
+    bar.innerHTML = (window._win && window._win.busHere)
+      ? '车现在在 ' + esc(window._win.busHere) + ' · 点站点看多久到'
+      : '点站点看车多久到';
+    return;
+  }
+
+  var r = rowOf(el);
+  if(!r) return;
+
+  /* 上游的 status 优先于本地的「已过站」判断 —— 本地说的是当前这班车开过去了，
+     上游回答的是「最近一班什么时候到这一站」，后者才是老人问的事。 */
+  var st = r.status || "";
+  var tail;
+  if(st === "passed"){
+    tail = '<b class="t">车已过站</b><span class="x">等下一班</span>';
+  } else if(st === "closed"){
+    tail = '<b class="t">今天收班了</b><span class="x">明天再来</span>';
+  } else if(st === "waiting"){
+    tail = '<b class="t">车还没发车</b><span class="x">等发车</span>';
+  } else if(st === "here"){
+    tail = '<b class="t">车在站上</b><span class="x">快上车</span>';
+  } else if(st === "noroute"){
+    tail = '<b class="t">查不到</b><span class="x">这站没车</span>';
+  } else if(r.passed){
+    tail = '<b class="t">车已过站</b><span class="x">等下一班</span>';
+  } else if(r.eta !== null && r.eta !== undefined){
+    tail = '<b class="t">约 ' + r.eta + ' 分钟</b><span class="x">· ' + r.left + ' 站</span>';
+  } else if(r.left !== null && r.left !== undefined){
+    tail = '<b class="t">还有 ' + r.left + ' 站</b><span class="x">无实时车</span>';
+  } else {
+    tail = '<b class="t">正在查…</b><span class="x">马上好</span>';
+  }
+
+  bar.className = "swabove hot";
+  bar.innerHTML = '<span class="to">到 ' + esc(r.name) + '</span>' + tail
+                + '<button class="bx" onclick="clearStop(event)" aria-label="取消选中">×</button>';
+}
+
+function clearStop(e){
+  if(e && e.stopPropagation) e.stopPropagation();
+  _picked = null;
+  var box = document.getElementById("swscroll");
+  if(box){
+    var s = box.querySelector('.swrow[data-sel="1"]');
+    if(s){ s.className = s.className.replace(" sel", ""); s.removeAttribute("data-sel"); }
+  }
+  fillEta(null);
+}
+
+/* 刷新后把选中接回来，并把视野停在那一站，别让老人重新找 */
+function restorePick(){
+  if(!_picked) return;
+  var box = document.getElementById("swscroll");
+  if(!box) return;
+  var el = box.querySelector('.swrow[data-i="' + _picked.i + '"]');
+  if(!el) return;
+  el.setAttribute("data-sel", "1");
+  el.className += " sel";
+  fillEta(el);
+  etaFetch(el);       // 15 秒刷新过一轮，这一站的数也要重问
+
+  var rowH = el.offsetHeight || 42;
+  var delta = el.getBoundingClientRect().top - box.getBoundingClientRect().top;
+  var target = box.scrollTop + delta - box.clientHeight * 0.4;
+  box.scrollTop = Math.max(0, Math.min(Math.round(target / rowH) * rowH,
+                                       box.scrollHeight - box.clientHeight));
+}
+
 function homeCard(main, other, win, station){
   station = station || HOME_STATION;
   var cls = main.dir==="1" ? "up" : "dn";
@@ -1179,13 +1404,16 @@ function homeCard(main, other, win, station){
   }
   h += '</div>';
 
-  if(win && win.rows && win.rows.length){
+    if(win && win.rows && win.rows.length){
     h += '<div class="swin">';
-    if(win.busHere) h += '<div class="swabove">车现在在 '+esc(win.busHere)+'</div>';
+    h += '<div class="swabove" id="swabove">'
+       + (win.busHere ? '车现在在 '+esc(win.busHere)+' · 点站点看多久到' : '点站点看车多久到')
+       + '</div>';
     h += '<div class="swscroll" id="swscroll">';
     for(var wi = 0; wi < win.rows.length; wi++){
       var r = win.rows[wi];
-      h += '<div class="swrow' + (r.mine ? ' mine' : '') + (r.bus ? ' bus' : '') + '">'
+      h += '<div class="swrow' + (r.mine ? ' mine' : '') + (r.bus ? ' bus' : '') + '"'
+         + ' data-i="' + r.i + '" onclick="pickStop(this)">'
          + '<span class="d"></span>'
          + '<span class="n">' + esc(r.name) + '</span>'
          + (r.mine ? '<span class="tm2">你在这</span>' : '')
@@ -1193,6 +1421,8 @@ function homeCard(main, other, win, station){
          + '</div>';
     }
     h += '</div></div>';
+    window._win = win;
+    window._winKey = main.line + "/" + main.dir;
   }
 
   var remTxt = remAt() ? ('响铃中 · ' + remAt() + ' 站') : '到站响铃';
@@ -1511,10 +1741,26 @@ document.addEventListener("pointerdown", function(){
 window.addEventListener("hashchange", route);
 route();
 
+
+
 /* 调试用：地址加 ?sheet=1 直接弹出响铃面板，方便截图核对 */
 if(location.search.indexOf("sheet=1") >= 0){
   setTimeout(function(){ try{ openSheet(); }catch(e){} }, 2600);
 }
+
+/* 调试用：地址加 ?pick=站序 自动选中那一站，方便截图核对估算条
+   （只点一次 —— pickStop 是开关，点两下就取消了） */
+(function(){
+  var m = location.search.match(/[?&]pick=(\d+)/);
+  if(!m) return;
+  var hit = false;
+  var t = setInterval(function(){
+    if(hit) return;
+    var row = document.querySelector('.swrow[data-i="' + m[1] + '"]');
+    if(row){ hit = true; clearInterval(t); pickStop(row); }
+  }, 250);
+  setTimeout(function(){ clearInterval(t); }, 9000);
+})();
 
 /* 装成 App 之后，响铃的那行说明要换掉 —— 后台也响是这个版本的主要卖点。
    顺便在面板最下面露一行服务器地址，点一下能改。 */
@@ -1622,6 +1868,16 @@ class Handler(BaseHTTPRequestHandler):
 
             elif path == "/api/home":
                 self._json(build_home())
+
+            elif path == "/api/eta":
+                # 点站点看车多久到：问的是「这一站」的实时到站
+                line = (q.get("line") or [""])[0].strip()
+                d = (q.get("dir") or ["1"])[0]
+                station = (q.get("station") or [""])[0].strip()
+                if not line:
+                    self._json({"ok": False, "error": "缺少线路名"})
+                else:
+                    self._json(build_eta(line, d, station))
 
             elif path == "/api/board":
                 line = (q.get("line") or [""])[0].strip()
