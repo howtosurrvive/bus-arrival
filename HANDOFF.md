@@ -281,6 +281,39 @@ centerMyStop()  把「你在这」滚到屏幕合适的位置
 
 三套配色的对照图在根目录 `配色比较.png`（可直接发人），细版在 `配色方案对比.html`。
 
+### 6.2b 附近站点与定位（V1.1 新增）
+
+**数据从哪来**：上游没有「给坐标反查站点」的接口（CMD 209 只能按站名查，
+`dis` 恒为 -1）。但 **CMD 103 的站表自带 `station_lat` / `station_lon`** ——
+一条线一次请求就能拿到全线坐标。所以站库是白捡的：
+
+- `bus-app/stations.json`：`{"站名": [[lat, lon], ...]}`，同名站可能有多个站台
+- 谁看过哪条线，`fetch_stops()` 就把那条线的站写进库（有变化才落盘）
+- 服务启动时后台线程跑一次 `warm_nearby_db()`，把默认线路两个方向补进来
+- 想换成别的城市：#保证 HOME_LINE 存在，或者手动把车站表灌进 json
+
+**距离**：`_dist_m()` 用 haversine 算直线距离。筛附近站点够用，不追求路网距离。
+
+**定位三条路，顺序不能换**（`JS` 里的 `locate()`）：
+
+| 顺序 | 来源 | 为什么 |
+| --- | --- | --- |
+| ① | `AndroidBridge.getLocation()` | WebView 加载的是 `http://192.168.x.x`，浏览器认为不是安全来源，`navigator.geolocation` 直接被拒 |
+| ② | `navigator.geolocation` | 只有 https 或 localhost 才给 |
+| ③ | 都没有 | **诚实说「拿不到位置」**，退回上次看的站。绝不编坐标 |
+
+App 侧：`AndroidManifest.xml` 声明 `ACCESS_FINE/COARSE_LOCATION`，
+`MainActivity` 里 `askLocPerm()` 启动时请求一次，`requestOneFix()` 异步取一次，
+结果存 `lastFix`（超过 10 分钟视为失效）。网页拿不到时会等 2.5 秒再问一次 ——
+系统权限框可能刚弹出来，用户还在点。
+
+**调试用 `?loc=lat,lng`**：给一个假坐标，只为在没有定位的环境（电脑、headless）
+里验证筛选和列表渲染。**它不是定位功能的一部分**，真机走原生桥。
+不要拿它当成"定位能用了"的证据。
+
+**接口**：`/api/nearby?lat=&lon=&r=`（r 取 300/800/2000，服务端夹在 100–3000）；
+`/api/home?station=站名`（不传就退回 `HOME_STATION`）。
+
 ### 6.3 改 CSS 前必看：三个段，改错段等于没改
 
 `skins.py` 里是**三段独立的 CSS**，拼接顺序是 `CSS_A + V2_OVERRIDE`：

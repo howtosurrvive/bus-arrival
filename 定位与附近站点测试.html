@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>定位与附近站点 · 测试流程</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  background:#F5F5F1;color:#1A1C1E;line-height:1.75;
+  padding:22px 16px 60px;-webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:720px;margin:0 auto}
+h1{font-size:23px;letter-spacing:-.4px;margin-bottom:4px}
+.sub{color:#8A8F94;font-size:13.5px;margin-bottom:18px}
+.lead{background:#fff;border:1px solid #E6E5DD;border-radius:16px;padding:16px 18px;margin-bottom:18px}
+.lead p{font-size:15px;margin-bottom:8px}
+.lead p:last-child{margin-bottom:0}
+.lead b{color:#0B2743}
+.warn{background:#FFF7EC;border-color:#F0D6B4;color:#7A5320}
+.warn b{color:#B45309}
+
+h2{
+  font-size:17px;margin:26px 0 10px;padding-left:11px;
+  border-left:4px solid #0B2743;line-height:1.3;
+}
+h2 .n{color:#0B2743;font-weight:800;margin-right:6px}
+.card{background:#fff;border:1px solid #E6E5DD;border-radius:14px;overflow:hidden}
+.step{display:flex;gap:11px;padding:13px 15px;border-bottom:1px solid #F0EFE8;font-size:14.5px}
+.step:last-child{border-bottom:0}
+.box{
+  flex:0 0 19px;width:19px;height:19px;margin-top:3px;
+  border:2px solid #C9CBC2;border-radius:5px;
+}
+.step .t{flex:1;min-width:0}
+.step .t b{display:block;font-weight:600;margin-bottom:2px}
+.step .t small{display:block;color:#7A7F74;font-size:13px;line-height:1.6}
+.expect{
+  display:inline-block;margin-top:6px;background:#EDF3F9;color:#164E7E;
+  border-radius:7px;padding:3px 9px;font-size:12.5px;font-weight:600;
+}
+.bad{background:#FDEDEA;color:#A5341B}
+code{
+  background:#F2F2EC;border-radius:5px;padding:1px 6px;
+  font-family:ui-monospace,Consolas,monospace;font-size:12.5px;
+  word-break:break-all;
+}
+pre{
+  background:#1B2733;color:#E6E9EC;border-radius:12px;padding:13px 15px;
+  font-family:ui-monospace,Consolas,monospace;font-size:12.5px;
+  line-height:1.65;overflow-x:auto;margin:10px 0;
+}
+pre .c{color:#8FA3B5}
+.note{background:#F7F7F2;border:1px solid #E8E7DE;border-radius:12px;padding:13px 16px;
+      font-size:14px;color:#4A5056;margin-top:10px}
+.note b{color:#1A1C1E}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;
+      font-size:14px;margin-top:10px;box-shadow:0 1px 2px rgba(22,32,43,.05)}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #F0EFE8;vertical-align:top}
+th{background:#F7F7F2;font-size:12.5px;color:#5C6166;font-weight:600}
+tr:last-child td{border-bottom:0}
+td.cur{white-space:nowrap;color:#8A8F94}
+.foot{color:#A0A49A;font-size:12.5px;text-align:center;margin-top:30px;line-height:1.9}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>定位与附近站点 · 测试流程</h1>
+<div class="sub">公交到站 老人版 · 2026-10-30 · 手机端逐条勾</div>
+
+<div class="lead">
+  <p><b>这次必须换包。</b>加了定位权限（GPS），旧包装上不会有这个能力。覆盖安装就行，不用卸载 —— 桌面图标和已存的响铃设置都还在。</p>
+  <p><b>先确认拿到的是新版</b>：打开 App → 右上角「设置」→ 面板最底下一行「页面版本」。是 <b>10-30 11:3x 之后</b>的才算。对不上就是电脑上那个黑色窗口还是旧的，重启它。</p>
+</div>
+
+<div class="lead warn">
+  <p><b>你的电脑不给定位，是对的。</b>电脑浏览器打开 <code>http://192.168.x.x:8765</code> 只会显示「拿不到位置」，这是设计如此，不是坏了。</p>
+  <p>这里有个坑要说清：页面地址是 <code>http://</code> 开头，浏览器认为「不是安全来源」，<b>直接拒绝定位</b>，连权限框都不弹。所以定位只能由 App 自己做，再把坐标交给页面。这就是为什么必须重装 APK。</p>
+</div>
+
+<h2><span class="n">一</span>装包与授权</h2>
+<div class="card">
+  <div class="step"><span class="box"></span><div class="t">
+    <b>装新包</b>
+    <small><code>D:\公交APK\公交到站-1.0.0.apk</code>，或仓库 <code>dist/</code> 里那个带哈希的文件。传手机 → 点安装 → 覆盖即可。</small>
+  </div></div>
+  <div class="step"><span class="box"></span><div class="t">
+    <b>打开 App，会弹一个定位权限框</b>
+    <small>第一次打开就会弹，因为 App 一进首页就要算「附近的站」。</small>
+    <span class="expect">这一条选「使用应用时允许」</span>
+  </div></div>
+  <div class="step"><span class="box"></span><div class="t">
+    <b>如果没弹、或者你手滑点了拒绝</b>
+    <small>页面会显示「拿不到位置」。去手机 设置 → 应用 → 公交到站 → 权限 → 位置，改成「使用应用时允许」，然后杀掉 App 重开。</small>
+    <span class="expect">页面不会崩、也不会瞎填一个位置 —— 只会说拿不到</span>
+  </div></div>
+</div>
+
+<h2><span class="n">二</span>首页该长什么样</h2>
+<div class="card">
+  <div class="step"><span class="box"></span><div class="t">
+    <b>「附近的站」右边写着「已定位」</b>
+    <small>写「正在定位…」超过 6 秒、或者写「拿不到位置」，都算没拿到。</small>
+    <span class="expect">已定位</span>
+  </div></div>
+  <div class="step"><span class="box"></span><div class="t">
+    <b>下面按由近到远列出站点，每个后面带距离</b>
+    <small>在家应该能看到石坦（几十米）、温州东瓯中学（两三百米）这些。距离是她到站台的实际直线距离。</small>
+    <span class="expect">最近的排最前，数字由小到大</span>
+  </div></div>
+  <div class="step"><span class="box"></span><div class="t">
+    <b>最近那个站自动被选中：左边一条深蓝竖线，站名变深加粗</b>
+    <small>不是只换个浅底色 —— 那条竖线是给老人扫一眼用的。</small>
+  </div></div>
+  <div class="step"><span class="box"></span><div class="t">
+    <b>再往下「石坦站 · 有车的在前」，列出这站的线路</b>
+    <small>标题里的站名要和上面选中的那个一致。</small>
+    <span class="expect">上下两段说的是同一个站</span>
+  </div></div>
+</div>
+
+<div class="note">
+  <b>一个已知限制，先说在前面：</b>石坦两个站台相距十几米，普通手机定位（尤其室内）分辨不到这个精度。所以这里<b>只做到「哪些站在范围内」</b>，不做到「你在马路哪一侧」。要分辨站台得靠导航级精度，现在没有。
+</div>
+
+<h2><span class="n">三</span>范围三档</h2>
+<div class="card">
+  <div class="step"><span class="box"></span><div class="t">
+    <b>点「300 米」</b>
+    <small>列表应该变短，只剩最近的站。按钮本身变成深蓝底白字。</small>
+    <span class="expect">300 米内的站 ≤ 800 米内的站</span>
+  </div></div>
+  <div class="step"><span class="box"></span><div class="t">
+    <b>点「2 公里」</b>
+    <small>列表变长。如果这范围内没站，会说「这个范围里没有站，把范围放大一点」，不会空着一片。</small>
+  </div></div>
+  <div class="step"><span class="box"></span><div class="t">
+    <b>杀掉 App 重开</b>
+    <small>上次选的范围会被记住（800 米是默认）。</small>
+    <span class="expect">不用每次重新点</span>
+  </div></div>
+</div>
+
+<h2><span class="n">四</span>自己选站（这次的重点）</h2>
+<div class="card">
+  <div class="step"><span class="box"></span><div class="t">
+    <b>点列表里第二个站</b>
+    <small>比如「温州东瓯中学」。点下去应该先亮一下蓝色再变。</small>
+    <span class="expect">竖线移到这个站，下面的线路立刻换成这站的</span>
+  </div></div>
+  <div class="step"><span class="box"></span><div class="t">
+    <b>核对上下两段是不是同一个站</b>
+    <small>标题从「石坦站」变成「温州东瓯中学站」，线路也应该是那个站才有的车。</small>
+  </div></div>
+  <div class="step"><span class="box"></span><div class="t">
+    <b>点线路进到站卡片，再返回</b>
+    <small>返回后应该还停在你选的那个站，不会跳回石坦。</small>
+    <span class="expect">选过的站记住</span>
+  </div></div>
+</div>
+
+<h2><span class="n">五</span>出门再测一次（这条最能验真伪）</h2>
+<div class="card">
+  <div class="step"><span class="box"></span><div class="t">
+    <b>在家里记下石坦的距离</b>
+    <small>比如 23 米 或 180 米，随便记个数。</small>
+  </div></div>
+  <div class="step"><span class="box"></span><div class="t">
+    <b>走到站台上，重开 App</b>
+    <small>距离应该明显变小（趋近 0–30 米），而且排第一的还是石坦。</small>
+    <span class="expect">数字跟着人动 = 定位是真的</span>
+  </div></div>
+  <div class="step"><span class="box"></span><div class="t">
+    <b>走开一两百米再看</b>
+    <small>顺序可能会变（另一个站更近了），这正常。</small>
+  </div></div>
+</div>
+
+<h2><span class="n">六</span>电脑上怎么验（不给定位）</h2>
+<div class="card">
+  <div class="step"><span class="box"></span><div class="t">
+    <b>电脑浏览器打开 <code>http://127.0.0.1:8765</code></b>
+    <small>应该显示「拿不到位置」+「下面是上次看的站」，而下面的线路列表<b>照常有内容</b>。</small>
+    <span class="expect">定位失败不影响查车</span>
+  </div></div>
+  <div class="step"><span class="box"></span><div class="t">
+    <b>想看「已定位」长什么样，加个假坐标</b>
+    <small>地址后面加 <code>?loc=27.96448,120.74736</code>（石坦站台的坐标）。这纯粹是调试用的假数据，只为在电脑上看排版和筛选逻辑。</small>
+    <span class="expect">列表出现 5 个站，石坦 23 米排第一</span>
+  </div></div>
+</div>
+
+<div class="note">
+  <b>别把 <code>?loc=</code> 当成「定位能用了」的证据。</b>它是写死的坐标，人不动它也不动。真定位只有手机上能验，就是上面第五节。
+</div>
+
+<h2><span class="n">七</span>出问题怎么报</h2>
+<table>
+  <tr><th style="width:38%">现象</th><th>大概率是什么</th></tr>
+  <tr><td>一直「正在定位…」不停</td><td>定位没回结果。安卓上 6 秒会自己收口，超过 6 秒还算异常——报给我，我看是不是权限回调没走通。</td></tr>
+  <tr><td>「拿不到位置」，但权限给了</td><td>手机「位置信息」总开关关着，或者室内 GPS 没信号。走到窗边/户外重开试试。</td></tr>
+  <tr><td>位置对了，但附近一个站都没有</td><td>站库还没建全。电脑上的服务重启过一次就会自动补默认线路的站。报给我，我加线路。</td></tr>
+  <tr><td>距离明显不对（差好几公里）</td><td>拿到了系统缓存的旧位置。杀掉 App 重开，让它重新定位。</td></tr>
+  <tr><td>设置面板底部版本号不是 10-30 11:3x</td><td>没拿到新页面。电脑上重启那个黑色窗口，手机上杀掉 App 重开。</td></tr>
+</table>
+
+<div class="note">
+  <b>验收就三条：</b>① 权限给到之后首页写「已定位」，附近站按距离排；② 点任意一个站，下面的线路跟着换；③ 走到站台，石坦的距离明显变小。
+</div>
+
+<div class="foot">
+  公交到站 老人版 · 定位走 App 原生，不经过任何第三方<br>
+  距离是直线距离，不是步行距离
+</div>
+
+</div>
+</body>
+</html>
