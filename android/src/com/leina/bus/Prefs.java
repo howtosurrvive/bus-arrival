@@ -14,8 +14,12 @@ public class Prefs {
     public static final String KEY_STATION = "station";
     public static final String KEY_AT = "at";
 
-    /** 构建时写入的默认地址；装到手机上第一次打开就能直接连。 */
+    /** 构建时写入的默认地址。默认空 —— 空的意思是「用装在手机里的那一套」，
+     *  不连电脑。想连电脑的人在设置里填地址即可。 */
     public static final String DEFAULT_SERVER = "@DEFAULT_SERVER@";
+
+    /** 空 = 自带数据（自己上网查）；非空 = 连电脑上的 server.py */
+    public boolean local() { return server().isEmpty(); }
 
     private final SharedPreferences sp;
 

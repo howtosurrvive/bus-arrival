@@ -104,12 +104,15 @@ public class BusService extends Service {
         final String station = prefs.station();
         final int at = prefs.at();
 
-        if (server.isEmpty() || line.isEmpty() || at <= 0) return;
+        // 没填服务器 = 用装在手机里的那一套，自己上网查，不需要电脑
+        if (line.isEmpty() || at <= 0) return;
 
         new Thread(new Runnable() {
             @Override public void run() {
                 try {
-                    Api.Board b = Api.board(server, line, dir, station);
+                    Api.Board b = server.isEmpty()
+                            ? Api.boardLocal(line, dir, station)
+                            : Api.board(server, line, dir, station);
                     if (!b.ok) {
                         note("查不到：" + (b.error == null ? "无数据" : b.error));
                         return;

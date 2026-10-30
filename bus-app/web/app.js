@@ -1,0 +1,1547 @@
+
+var HOME_STATION = "石坦";
+var HOME_LINE = "36路";
+var speakOn = false;
+var timer = null;
+var _fired = {};
+var _bannerHot = false;
+
+function pad(n){return n<10?"0"+n:""+n}
+function esc(s){return (s||"").replace(/[&<>"]/g,function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];});}
+
+function ls(k,v){
+  try{
+    if(v===undefined) return localStorage.getItem(k);
+    localStorage.setItem(k,v);
+  }catch(e){ return null; }
+}
+
+function speak(text){
+  if(!speakOn || !window.speechSynthesis || !text) return;
+  window.speechSynthesis.cancel();
+  var u = new SpeechSynthesisUtterance(text);
+  u.lang="zh-CN"; u.rate=0.85; u.pitch=1.0;
+  window.speechSynthesis.speak(u);
+}
+
+function api(url){
+  var D = window.__DATA__ || null;
+  if(D){
+    if(D[url]) return Promise.resolve(D[url]);
+    return Promise.resolve({ok:false, error:"演示版只内置了几个例子，跑本地服务才能查全部"});
+  }
+  // 装在手机上时没有后端：api-local.js 会装上 window.localApi，
+  // 接口地址和返回结构跟 server.py 一模一样，所以这里的调用方一行都不用改。
+  if(window.localApi){ return window.localApi(url); }
+  return fetch(url,{cache:"no-store"}).then(function(r){return r.json();});
+}
+
+/* ---------------------------------------------------------- 到站提醒 */
+function remAt(){
+  var v = parseInt(ls("remAt") || "0", 10);
+  return isNaN(v) ? 0 : v;
+}
+
+function initAudio(){
+  if(window._ac) return;
+  try{
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if(AC) window._ac = new AC();
+  }catch(e){}
+}
+
+/* 三声短促的提示音。用振荡器现场合成，不依赖任何音频文件 */
+function beep(n){
+  var ac = window._ac;
+  if(!ac) return;
+  try{
+    if(ac.state === "suspended") ac.resume();
+    var t0 = ac.currentTime + 0.02;
+    for(var i = 0; i < n; i++){
+      var o = ac.createOscillator(), g = ac.createGain();
+      o.type = "sine";
+      o.frequency.setValueAtTime(i % 2 ? 620 : 880, t0 + i * 0.40);
+      g.gain.setValueAtTime(0.0001, t0 + i * 0.40);
+      g.gain.exponentialRampToValueAtTime(0.45, t0 + i * 0.40 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + i * 0.40 + 0.30);
+      o.connect(g); g.connect(ac.destination);
+      o.start(t0 + i * 0.40); o.stop(t0 + i * 0.40 + 0.32);
+    }
+  }catch(e){}
+}
+
+function buzz(p){
+  try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){}
+}
+
+function showBanner(t, s, hot){
+  var b = document.getElementById("banner");
+  if(!b) return;
+  _bannerHot = !!hot;
+  b.className = "banner" + (hot ? " hot" : "");
+  b.innerHTML = '<div class="btext"><div class="bt">' + esc(t) + '</div>'
+              + (s ? '<div class="bs">' + esc(s) + '</div>' : '') + '</div>'
+              + '<button class="bx" onclick="hideBanner()">知道了</button>';
+  void b.offsetWidth;
+  b.className += " show";
+}
+
+function hideBanner(){
+  var b = document.getElementById("banner");
+  if(b) b.className = "banner" + (_bannerHot ? " hot" : "");
+}
+
+function openSheet(){
+  var m = document.getElementById("mask"), s = document.getElementById("sheet");
+  if(m) m.classList.add("show");
+  if(s) s.classList.add("show");
+  var at = remAt(), os = document.querySelectorAll(".opt");
+  for(var i = 0; i < os.length; i++){
+    os[i].className = "opt" + (parseInt(os[i].getAttribute("data-n"), 10) === at ? " sel" : "");
+  }
+  var cs = curSkin(), ts = document.querySelectorAll(".th");
+  for(var j = 0; j < ts.length; j++){
+    ts[j].className = "th" + (ts[j].getAttribute("data-sk") === cs ? " sel" : "");
+  }
+  // 这行字是给「到底改了没有」这个问题用的：手机拿到的页面是哪一版，一眼可见
+  var bl = document.getElementById("buildline");
+  if(bl) bl.textContent = "页面版本 " + (document.body.getAttribute("data-build") || "未知");
+}
+
+/* 当前配色：服务端渲染时写在 body 上，前端不用自己猜 */
+function curSkin(){
+  return document.body.getAttribute("data-sk") || "c";
+}
+
+/* 换配色：记进 cookie，然后重新进一次页面（不是 reload —— 要顺手清掉地址里的
+   ?skin=，否则从对比链接进来的人换了色，刷新还是老配色，会以为没生效）。
+   清完参数 hash 还在原地，老人换个颜色不会被弹回首页。 */
+function setSkin(v){
+  if(v === curSkin()){ closeSheet(); return; }
+  /* 装在手机上时没有服务端，cookie 没人读 —— 直接换样式表，
+     记在手机上，下次打开还是这个颜色。 */
+  if(window.__ASSETS__){
+    var link = document.getElementById("sk");
+    if(link) link.href = "skins/" + v + ".css";
+    document.body.setAttribute("data-sk", v);
+    ls("skin", v);
+    closeSheet();
+    route();
+    return;
+  }
+  /* 离线演示是单个 html 文件，连样式表都没有，换不了色 —— 别让人点了没反应 */
+  if(location.protocol === "file:"){
+    closeSheet();
+    showBanner("演示版换不了", "装到手机上就能换", false);
+    setTimeout(hideBanner, 2600);
+    return;
+  }
+  document.cookie = "sk=" + v + ";path=/;max-age=31536000;SameSite=Lax";
+  location.replace(location.pathname + location.hash);
+}
+
+/* 打开页面时把上次选的配色装上 —— 服务端在的时候它已经把 data-sk 写好了，
+   这里只管没有服务端的那种情况 */
+(function restoreSkin(){
+  if(!window.__ASSETS__) return;
+  var v = ls("skin");
+  if(!v || v === curSkin()) return;
+  var link = document.getElementById("sk");
+  if(link) link.href = "skins/" + v + ".css";
+  document.body.setAttribute("data-sk", v);
+})();
+
+function closeSheet(){
+  var m = document.getElementById("mask"), s = document.getElementById("sheet");
+  if(m) m.classList.remove("show");
+  if(s) s.classList.remove("show");
+}
+
+function pickAt(n){
+  initAudio();
+  beep(1);
+  ls("remAt", String(n));
+  _fired = {};
+  closeSheet();
+  viewHome();
+  syncWatch();
+  showBanner("响铃已开", "车还有 " + n + " 站时会响一声", false);
+  setTimeout(hideBanner, 2800);
+}
+
+function turnOff(){
+  ls("remAt", "0");
+  _fired = {};
+  closeSheet();
+  viewHome();
+  syncWatch();
+}
+
+/* 每次轮询后检查。同一趟车只响一次，车走了再响下一趟 */
+function checkRemind(main){
+  var at = remAt();
+  if(!at || !main) return;
+  if(bridge()) return;   // App 里交给后台服务响，网页再响一次就成了两声
+  var st = main.stations, k = main.dir || "1";
+
+  if(st !== null && st > at){ delete _fired[k + "w"]; delete _fired[k + "n"]; }
+
+  if(st !== null && st <= at && !_fired[k + "w"]){
+    _fired[k + "w"] = 1;
+    beep(3); buzz([280, 150, 280]);
+    showBanner("车还有 " + st + " 站", "该出门了，往 " + (main.toShort || ""), false);
+  }
+  if((main.status === "here" || main.minutes === 0) && !_fired[k + "n"]){
+    _fired[k + "n"] = 1; _fired[k + "w"] = 1;
+    beep(4); buzz([300, 140, 300, 140, 300]);
+    showBanner("车到站了", "快上车，往 " + (main.toShort || ""), true);
+  }
+}
+
+/* --------------------------------------------------- 和 App（安卓壳）对接
+   浏览器里没有 AndroidBridge，下面每个函数都静默跳过，网页行为一点不变。
+   装成 App 之后，响铃由后台服务负责 —— 切出去、锁屏都还在看着。 */
+var _watch = null;
+
+function bridge(){
+  return (typeof AndroidBridge !== "undefined" && AndroidBridge) ? AndroidBridge : null;
+}
+
+/* 把「现在在看哪条线、响几站」告诉 App。离开到站卡片就不动它：
+   老人设好提醒往往直接按 Home 键，这时 _watch 还留着才是对的。 */
+function syncWatch(){
+  var B = bridge(); if(!B) return;
+  try{
+    if(!_watch){ B.setWatch("", "", "", 0); return; }
+    B.setWatch(_watch.line, _watch.dir, _watch.station, remAt());
+  }catch(e){}
+}
+
+function go(hash){
+  // 点的是列表里的一行/一张卡：先亮 90ms 再跳。
+  // 老人判断「点了没有」靠的是眼前有没有动，不是靠下一页出没出来 ——
+  // 网络慢的时候，没有这一下他会以为没点中，接着连点三下。
+  var t = window._lastTap;
+  window._lastTap = null;
+  var isCard = t && t.classList && (t.classList.contains("row") || t.classList.contains("dircard"));
+  if(isCard){
+    t.classList.add("tapped");
+    setTimeout(function(){
+      t.classList.remove("tapped");
+      if(location.hash === hash){ route(); } else { location.hash = hash; }
+    }, 90);
+    return;
+  }
+  if(location.hash === hash){ route(); } else { location.hash = hash; }
+}
+
+/* 一个站有哪些车：每行 = 一条线的一个方向。首页和站牌页共用这一份。
+   点进去就是那张到站卡片，方向已经在行上选好了。 */
+function stationRows(lines, station, limit){
+  limit = limit || 6;
+  var h = "";
+  for(var i = 0; i < lines.length; i++){
+    var v = lines[i];
+    var hidden = i >= limit;
+    var tm = "", tcls = "";
+    if(v.status === "coming" && v.minutes !== null){
+      tm = (v.minutes === 0 ? "马上到" : v.minutes + "′");
+      if(v.minutes <= 2){ tcls = "hot"; }
+    }
+    else if(v.status === "here"){ tm = "在站上"; tcls = "hot"; }
+    else if(v.status === "waiting"){ tm = "等发车"; tcls = "wait"; }
+    else if(v.status === "closed"){ tm = "收班"; tcls = "wait"; }
+    else { tm = "—"; tcls = "wait"; }
+
+    var href = '#/b/' + encodeURIComponent(v.line) + '/' + v.dir
+             + '?st=' + encodeURIComponent(station);
+    h += '<div class="row' + (i === 0 ? " first" : "") + '" '
+       + (hidden ? 'style="display:none"' : '') + ' data-late="' + (hidden ? 1 : 0) + '" '
+       + 'onclick="go(\'' + href + '\')">'
+       + '<span class="ln">' + esc(v.line) + '</span>'
+       + '<span class="dst">往 <b>' + esc(v.toShort) + '</b></span>'
+       + '<span class="tm ' + tcls + '">' + tm + '</span>'
+       + '<span class="arrow">›</span></div>';
+  }
+  return h;
+}
+
+/* 首页 = 附近站牌 + 搜索。这里只负责选「哪条线哪个方向」，
+   具体的到站大卡片在 #/b/线路/方向 那一页。 */
+/* ---- 附近站点：定位 → 筛范围 → 自己选站 -------------------------------
+   位置只有两个来源，都是真来源，拿不到就说拿不到：
+   ① App 里的原生桥（优先）—— WebView 加载的是 http:// 局域网地址，浏览器
+      会因为「不是安全来源」直接拒绝 navigator.geolocation；
+   ② 浏览器 geolocation（https 或 localhost 才给）。
+   两个都失败就退回上次用的站，绝不编一个坐标出来。 */
+var _near = { lat: null, lon: null, r: 800, list: [], cur: "",
+              fold: false, lstName: "", picked: false, total: 0 };
+
+/* 附近站点的距离档位。
+   「2 公里」这一档 2026-10-30 从界面上拿掉了 —— 老人要坐的车和站基本是固定的，
+   摆三档反而多一次「我该选哪个」的犹豫。实测：市区 800 米内 15–22 个站已经够用，
+   2 公里是 76–99 个，扫起来比选站还累。
+
+   代码没扔，恢复只需把下面这行改回 [300, 800, 2000]：
+   后端 build_nearby() 本来就吃任意半径（夹在 100–3000），
+   /api/nearby 里也有 `rad >= 2000 → limit 60` 的分支。实测数据见 HANDOFF 6.2b。 */
+var _RANGES = [300, 800];
+
+function nearR(){
+  var v = parseInt(ls("nearR") || "800", 10);
+  // 老版本选过 2000 的，localStorage 里还留着那个值 —— 落回 800，别让她打开就是空列表
+  return _RANGES.indexOf(v) >= 0 ? v : 800;
+}
+
+function locate(cb, retried){
+  var done = false;
+  function fin(v){ if(!done){ done = true; cb(v); } }
+
+  if(window.__forceLoc){ fin(window.__forceLoc); return; }
+
+  // ① 原生桥
+  try{
+    var B = window.AndroidBridge;
+    if(B && B.getLocation){
+      var raw = B.getLocation();          // "lat,lng"；拿不到回空串
+      if(raw && raw.indexOf(",") > 0){
+        var a = raw.split(",");
+        var la = parseFloat(a[0]), lo = parseFloat(a[1]);
+        if(isFinite(la) && isFinite(lo) && la !== 0){ fin({lat:la, lon:lo, src:"app"}); return; }
+      }
+      // 在 App 里却拿不到坐标：多半是系统权限框刚弹出来，用户还在点。
+      // 等两秒再问一次，别急着说「定位不到」。
+      if(!retried){
+        setTimeout(function(){ locate(cb, true); }, 2500);
+        return;
+      }
+    }
+  }catch(e){}
+
+  // ② 浏览器
+  if(!navigator.geolocation){ fin(null); return; }
+
+  function ask(){
+    try{
+      navigator.geolocation.getCurrentPosition(
+        function(p){ fin({lat:p.coords.latitude, lon:p.coords.longitude, src:"web"}); },
+        function(){ fin(null); },
+        {enableHighAccuracy:true, timeout:6000, maximumAge:120000}
+      );
+    }catch(e){ fin(null); return; }
+    // 有的浏览器既不回成功也不回失败，自己兜一个超时，别让页面一直卡在「正在定位」
+    setTimeout(function(){ fin(null); }, 5000);
+  }
+
+  // 已经明确被拒绝的（http 非安全来源、用户点过不允许），别再等
+  if(navigator.permissions && navigator.permissions.query){
+    navigator.permissions.query({name:"geolocation"}).then(function(st){
+      if(st && st.state === "denied"){ fin(null); } else { ask(); }
+    }).catch(ask);
+  } else {
+    ask();
+  }
+}
+
+function rangeBtns(){
+  var rs = _RANGES, h = "";
+  for(var i = 0; i < rs.length; i++){
+    var t = rs[i] < 1000 ? (rs[i] + " 米") : (rs[i] / 1000 + " 公里");
+    h += '<button class="rg' + (rs[i] === _near.r ? " sel" : "") + '" data-r="' + rs[i]
+       + '" onclick="setRange(' + rs[i] + ')">' + t + '</button>';
+  }
+  return h;
+}
+
+function setRange(r){
+  _near.r = r;
+  ls("nearR", String(r));
+  var bs = document.querySelectorAll(".rg");
+  for(var i = 0; i < bs.length; i++){
+    bs[i].className = "rg" + (parseInt(bs[i].getAttribute("data-r"), 10) === r ? " sel" : "");
+  }
+  if(_near.lat !== null) fetchNearby();
+}
+
+function fmtDist(m){
+  return m < 1000 ? (m + " 米") : ((m / 1000).toFixed(1) + " 公里");
+}
+
+/* ---- 常去的站 ---------------------------------------------------------
+   收藏存在手机上（localStorage），服务端不记 —— 这是她这台手机的偏好。
+   收藏的站不受半径限制：老人真正要坐的就那两三个站，走远一点也还是它。
+   家里定位常偏，半径算不算得进来本来就不可靠，靠收藏兜底更实在。 */
+function faves(){
+  try{
+    var a = JSON.parse(ls("faves") || "[]");
+    return (a && a.length !== undefined) ? a : [];
+  }catch(e){ return []; }
+}
+
+function isFave(n){ return faves().indexOf(n) >= 0; }
+
+function toggleFave(n){
+  if(!n) return;
+  var a = faves(), i = a.indexOf(n);
+  if(i >= 0) a.splice(i, 1); else a.push(n);
+  ls("faves", JSON.stringify(a));
+  renderNear("");
+  var fb = document.getElementById("favbtn");
+  if(fb) setFavBtn(fb, n);
+
+  // 刚收藏的站如果站库里还没有坐标，顺手补一次 —— 不然永远显示「常去」没有距离。
+  // 失败也无所谓：收藏本身就生效了，下次定位时再补。
+  if(i < 0 && _near.lat !== null){
+    api("/api/stloc?name=" + encodeURIComponent(n)).then(function(p){
+      if(p && p.ok) fetchNearby();
+    }).catch(function(){});
+  }
+}
+
+function setFavBtn(b, name){
+  var on = isFave(name);
+  b.textContent = on ? "★" : "☆";
+  b.className = "favbtn" + (on ? " on" : "");
+  b.setAttribute("aria-label", on ? "取消收藏" : "收藏这个站");
+}
+
+function markNear(){
+  var box = document.getElementById("nlist");
+  if(!box) return;
+  var its = box.querySelectorAll(".nitm");
+  for(var i = 0; i < its.length; i++){
+    var on = its[i].getAttribute("data-st") === _near.cur;
+    its[i].className = "row nitm" + (on ? " sel" : "");
+  }
+}
+
+function renderNear(msg){
+  var box = document.getElementById("nlist");
+  if(!box) return;
+
+  var fav = faves();
+  var distOf = {};
+  for(var i = 0; i < _near.list.length; i++) distOf[_near.list[i].name] = _near.list[i].dist;
+
+  var rows = [], k;
+  // 收藏的站先出：没有定位、超出范围，也照样在
+  for(k = 0; k < fav.length; k++){
+    rows.push({name: fav[k], dist: (distOf.hasOwnProperty(fav[k]) ? distOf[fav[k]] : null)});
+  }
+  for(k = 0; k < _near.list.length; k++){
+    var it = _near.list[k];
+    if(fav.indexOf(it.name) >= 0) continue;      // 已经在上面的收藏里了
+    rows.push({name: it.name, dist: it.dist});
+  }
+
+  if(!rows.length){
+    // 「把范围放大一点」这句话在只剩两档之后不能照搬了：
+    // 300 米能放大到 800，800 米再往上没有档了 —— 那就直说下一步去哪儿找
+    var tip = msg;
+    if(!tip){
+      tip = _near.r < 800
+        ? "这个范围里没有站，换成「800 米」看看"
+        : "800 米内没有站。用上面的搜索框搜站名，进到那站以后点 ☆ 存下来，"
+        + "以后不用管定位也能找到";
+    }
+    box.innerHTML = '<div class="nearnone">' + esc(tip) + '</div>';
+    return;
+  }
+
+  var h = "";
+  for(k = 0; k < rows.length; k++){
+    var r = rows[k], on = r.name === _near.cur, star = isFave(r.name);
+    h += '<div class="row nitm' + (on ? " sel" : "") + '" '
+       + 'data-st="' + esc(r.name) + '" '
+       + 'onclick="pickStation(this.getAttribute(\'data-st\'))">'
+       + '<span class="dst">' + esc(r.name) + '</span>'
+       + '<span class="nd">' + (r.dist === null ? "常去" : fmtDist(r.dist)) + '</span>'
+       + '<button class="favtog' + (star ? " on" : "") + '" '
+       + 'data-st="' + esc(r.name) + '" '
+       + 'onclick="event.stopPropagation();toggleFave(this.getAttribute(\'data-st\'))" '
+       + 'aria-label="' + (star ? "取消收藏" : "收藏这个站") + '">'
+       + (star ? "★" : "☆") + '</button>'
+       + '</div>';
+  }
+  // 被截掉了就说出来 —— 「2 公里内只有 30 个站」是假话，
+  // 真实有七八十个，老人找不到自己要的那站会以为它不存在
+  if(_near.total && _near.total > rows.length){
+    h += '<div class="nearmore">这个范围里共 ' + _near.total + ' 个站，'
+       + '先列最近的 ' + rows.length + ' 个。把范围缩小一点能看全。</div>';
+  }
+  box.innerHTML = h;
+  paintNearSlim();
+}
+
+function fetchNearby(){
+  var box = document.getElementById("nlist");
+  if(box) box.innerHTML = '<div class="loading" style="padding:16px">正在找附近的站…</div>';
+  api("/api/nearby?lat=" + _near.lat + "&lon=" + _near.lon + "&r=" + _near.r
+    + "&faves=" + encodeURIComponent(faves().join(",")))
+  .then(function(p){
+    if(!p.ok){ renderNear("查不到附近站点"); return; }
+    _near.list = p.stations || [];
+    _near.total = p.total || _near.list.length;
+
+    // 定位成功、可这一圈里一个站都没有，而且用户也没自己选过站：
+    // 下面不要拿后端默认站（石坦）充数 —— 人在乐清，看到 36 路的石坦站，
+    // 会以为自己站错地方了。这里明说下一步该干什么。
+    if(!_near.list.length && !_near.picked){
+      _near.cur = "";
+      _near.lstName = "";
+      foldNear(false);
+      paintNearSlim();          // 里面的 paintCurHead 会把空标题收起来
+      // 线路区就空着 —— 上面那段提示已经把「去搜站名」说清楚了，
+      // 再补一句同样的话只会让这块看起来更像出错了
+      var el0 = document.getElementById("lst");
+      if(el0) el0.innerHTML = '';
+      renderNear("");
+      return;
+    }
+
+    renderNear("");
+    // 第一次来就选最近的那个；已经选过站就别动她的选择
+    if(!_near.picked && _near.list.length) pickStation(_near.list[0].name, false);
+    else { markNear(); paintNearSlim(); }
+  })
+  .catch(function(){ renderNear("连不上，附近站点查不了"); });
+}
+
+/* 选中一个站：高亮它，再把下半部分换成这站的线路 */
+function pickStation(name, byUser){
+  if(!name) return;
+  _near.cur = name;
+  if(byUser){ ls("homeStation", name); _near.picked = true; }
+  markNear();
+  loadStation(name);
+  // 用户自己点的站才收起列表 —— 第一次进来自动选最近站时不收，
+  // 让她先看见附近有哪些站，知道这页是干什么的
+  if(byUser){
+    foldNear(true);
+    var sec = document.getElementById("cursec");
+    if(sec && sec.scrollIntoView){ try{ sec.scrollIntoView({block:"start"}); }catch(e){} }
+  } else {
+    // 自动选站：保持展开，但「收起」按钮这会儿该出现了（原来没有站可选，收了没得选）
+    foldNear(_near.fold);
+    paintNearSlim();
+  }
+}
+
+/* ---- 附近站点的折叠 ----
+   2 公里一档能列出几十个站，全摊在页面上，滑到「这站有哪些车」要拨好几屏。
+   选定站以后就把整块收成一行摘要，线路直接顶上来。
+   收起来的前提是「已经选好了一个站」—— 一个都没选时不许收，否则没得选。 */
+function foldNear(on){
+  var z = document.getElementById("nearzone");
+  var b = document.getElementById("nearcur");
+  var f = document.getElementById("nfold");
+  if(!z || !b) return;
+  if(on && !_near.cur) on = false;
+  _near.fold = on;
+  z.className = on ? "nearfold" : "";
+  b.className = "nearcur" + (on ? " on" : "");
+  if(f) f.className = "nfold" + (!on && _near.cur ? " on" : "");
+  if(on) paintNearSlim();
+  paintCurHead();
+}
+
+/* 折叠条上写：站名 · 距离 · 换个站 */
+function paintNearSlim(){
+  var b = document.getElementById("nearcur");
+  if(!b) return;
+  // 「收起」按钮和折叠条是一体的两面：选了站才谈得上收起。
+  // 放在这里同步，凡是改了 _near.cur 的地方（自动选站、后端兜底、用户点选）
+  // 只要调过 paintNearSlim，按钮就不会漏更新。
+  var f = document.getElementById("nfold");
+  if(f) f.className = "nfold" + (!_near.fold && _near.cur ? " on" : "");
+  var name = _near.cur || "";
+  var d = null;
+  for(var i = 0; i < _near.list.length; i++){
+    if(_near.list[i].name === name){ d = _near.list[i].dist; break; }
+  }
+  b.innerHTML = '<span class="nc">' + esc(name) + '</span>'
+    + '<span class="nd">' + (d == null ? (name ? "常去" : "") : fmtDist(d)) + '</span>'
+    + '<span class="nsw">换个站 ›</span>';
+}
+
+/* 「XX站 · 有车的在前」—— 折叠时站名已经在上面那行了，别再说一遍 */
+function stTitle(n){
+  n = n || "";
+  if(n.indexOf("站") >= 0 || /[）)]$/.test(n)) return n;
+  return n + "站";
+}
+
+function paintCurHead(){
+  var sec = document.getElementById("cursec");
+  if(!sec) return;
+  var n = _near.lstName || _near.cur;
+  if(!n){ sec.textContent = ""; sec.style.display = "none"; return; }
+  sec.style.display = "";
+  sec.textContent = (_near.fold ? "" : stTitle(n) + " · ") + "有车的在前";
+}
+
+/* 拉某个站有哪些车。name 为空时后端退回默认站 */
+function loadStation(name){
+  var el = document.getElementById("lst");
+  if(!el) return;
+  el.innerHTML = '<div class="loading" style="padding:16px">正在查这站有哪些车…</div>';
+  api("/api/home?station=" + encodeURIComponent(name || ""))
+  .then(function(p){
+    if(!p.ok){ el.innerHTML = errBox("查不到", p.error); return; }
+    _near.lstName = p.station;
+    paintCurHead();
+    var ck = document.getElementById("clock");
+    if(ck) ck.innerHTML = '<i class="live"></i>' + p.updated;
+
+    if(!_near.cur){ _near.cur = p.station; markNear(); paintNearSlim(); }
+
+    var lines = p.lines || [];
+    if(!lines.length){
+      el.innerHTML = '<div class="tip" style="padding:12px 0 20px">这站没有线路</div>';
+      return;
+    }
+    el.innerHTML = stationRows(lines, p.station)
+      + (lines.length > 6
+         ? '<div class="more" onclick="showMore()">还有 ' + (lines.length - 6) + ' 条线，点这里看 ›</div>'
+         : '');
+  })
+  .catch(function(){ el.innerHTML = errBox("连不上", "检查电脑上的程序是否还在运行"); });
+}
+
+function viewHome(){
+  var el = document.getElementById("app");
+  _near.r = nearR();
+  _near.cur = ls("homeStation") || "";
+  _near.picked = !!_near.cur;      // 用户自己选过的站才算，后端兜底的默认站不算
+  _near.list = [];
+  _near.total = 0;
+
+  el.innerHTML = '<div class="nav"><span class="t">附近站牌</span>'
+    + '<button class="setlink" onclick="openSheet()">设置</button>'
+    + '<span class="r" id="clock"><i class="live"></i>--:--</span></div>'
+    + '<div class="sbar">'
+    + '<input id="hkw" class="sinput" type="search" inputmode="search" '
+    + 'placeholder="搜线路号或站名" '
+    + 'onkeydown="if(event.key===\'Enter\'){event.preventDefault();homeSearch();}">'
+    + '<button class="sbtn" onclick="homeSearch()">搜</button></div>'
+    + '<div class="scroll flush">'
+    + '<div id="nearzone">'
+    + '<div class="nearhead"><span class="nh" id="nhtitle">附近的站</span>'
+    + '<span class="nstate" id="locstate">正在定位…</span>'
+    + '<button class="nfold" id="nfold" onclick="foldNear(true)">收起</button></div>'
+    + '<div class="ranges">' + rangeBtns() + '</div>'
+    + '<div id="nlist"><div class="loading" style="padding:16px">正在定位…</div></div>'
+    + '</div>'
+    + '<button class="nearcur" id="nearcur" onclick="foldNear(false)"></button>'
+    + '<div class="curhead" id="cursec">这站有哪些车</div>'
+    + '<div id="lst"></div>'
+    + '</div>';
+
+  // 上次看过哪个站，这次就直接从那站开始，并且把附近列表收起来 ——
+  // 老人开机只想看车，不想先滑过一屏站名
+  _near.lstName = "";
+  foldNear(_near.picked);
+
+  // 先把「这站有哪些车」显示出来 —— 定位可能要等几秒，不能让她对着空页面等
+  loadStation(_near.cur);
+
+  locate(function(pos){
+    var st = document.getElementById("locstate");
+    if(!pos){
+      if(st) st.textContent = "拿不到位置";
+      // 没定位就只显示常去的站 —— 这时候「附近的站」这个标题是假话
+      var t = document.getElementById("nhtitle");
+      if(t) t.textContent = "常去的站";
+      renderNear("还没有常去的站。用上面的搜索框搜站名，进到那站以后点 ☆ 就能存下来，"
+               + "以后不用管定位");
+      return;
+    }
+    var t2 = document.getElementById("nhtitle");
+    if(t2) t2.textContent = "附近的站";
+    _near.lat = pos.lat;
+    _near.lon = pos.lon;
+    if(st) st.textContent = "已定位";
+    fetchNearby();
+  });
+}
+
+function homeSearch(){
+  var v = (document.getElementById("hkw").value || "").trim();
+  if(!v) return;
+  go('#/search?kw=' + encodeURIComponent(v));
+}
+
+/* 到站卡片：一条线一个方向，就是原来首页那张卡，现在可以装任意线路 */
+function viewBoard(line, dir, station, silent){
+  var el = document.getElementById("app");
+  // 换了线路或方向，上一次选中的站就不作数了；同一条线刷新则保留
+  if(_picked && _picked.key !== (line + "/" + dir)) _picked = null;
+  // 只有第一次进来才显示「正在查车」。15 秒的定时刷新走静默路径 ——
+  // 整页清空再重画会让画面闪一下、还会把老人正在翻的站点列表拽回原位。
+  if(!silent) el.innerHTML = '<div class="loading">正在查车…</div>';
+  api("/api/board?line=" + encodeURIComponent(line)
+    + "&dir=" + encodeURIComponent(dir)
+    + "&station=" + encodeURIComponent(station || ""))
+  .then(function(p){
+    if(!p.ok){
+      if(silent) return;                  // 刷新失败就留着旧画面，别把错误糊上去
+      el.innerHTML = errBox("没查到车", p.error);
+      return;
+    }
+    // 静默刷新：能贴数据就贴，贴不了（换线了、DOM 不在了）再退回首屏重绘
+    if(silent && paintBoard(p, line, dir)) return;
+
+    var html = '<div class="nav"><button class="back" onclick="back()">‹ 返回</button>'
+             + '<span class="t">'+esc(p.station)+'站</span>'
+             + '<span class="r" id="clock"><i class="live"></i>'+p.updated+'</span></div>';
+    html += '<div class="scroll home">';
+    html += homeCard(p.main, p.other, p.win, p.station);
+    html += '</div>';
+    html += '<div class="btnrow">'
+          + '<button class="btn s" onclick="go(\'#/s/\'+encodeURIComponent(p.station))">这站的车</button>'
+          + '<button class="btn p" onclick="toggleSpeak()">'+(speakOn?"念 ✓":"念一遍")+'</button>'
+          + '</div>';
+    el.innerHTML = html;
+
+    centerMyStop();
+    restorePick();
+    window._speech = mainSpeech(p.main, p.other);
+    if(speakOn) speak(window._speech);
+    _watch = {line: line, dir: dir, station: p.station};
+    syncWatch();
+    checkRemind(p.main);
+  }).catch(function(){
+    if(silent) return;                     // 网络抖一下不该把整页换成错误提示
+    el.innerHTML = errBox("连不上", "检查电脑上的程序是否还在运行");
+  });
+}
+
+/* 静默刷新：只改「变了的那几个字」，不重建 DOM。
+   这样滚动位置、点选的站、列表的滚动惯性全都原样保留 —— 老人正看到一半，
+   画面不该因为她等了两秒就被重来一次。
+   返回 false 表示贴不上去（换线路了 / DOM 不在了），交给首屏重绘兜底。 */
+function paintBoard(p, line, dir){
+  var card = document.querySelector(".card");
+  if(!card) return false;
+  // 线路或方向对不上，说明这次刷新的结果不该覆盖当前画面
+  var no = card.querySelector(".lineno");
+  if(no && no.textContent !== p.main.line) return false;
+  if(_watch && (_watch.line !== line || _watch.dir !== dir)) return false;
+
+  var main = p.main, win = p.win;
+
+  // 卡片紧急态（3 分钟内变红）可能变
+  var urgent = (main.status==="coming" && main.minutes!==null && main.minutes<=3);
+  card.classList.toggle("urgent", urgent);
+
+  // 中间那块（数字 / 状态）：内容真变了才写。
+  // 原来是每次 new 一个 div 再 replaceChild —— 元素换了节点就要重排一次，
+  // 数字没变的时候也重排，看着就是「每 15 秒跳一下」。现在先比字符串。
+  var mid = card.querySelector(".cmid");
+  if(mid){
+    var nh = midInner(main, p.station);
+    if(mid.innerHTML !== nh) mid.innerHTML = nh;
+    var ar = ariaText(main, p.station);
+    if(mid.getAttribute("aria-label") !== ar) mid.setAttribute("aria-label", ar);
+  }
+
+  // 右上角更新时间。绿点不重建 —— 它带呼吸动画，重建会让动画从头开始，看着像闪
+  var ck = document.getElementById("clock");
+  if(ck){
+    ck.className = "r";
+    var lv = ck.querySelector(".live");
+    if(!lv){
+      ck.innerHTML = '<i class="live"></i>' + p.updated;
+    } else {
+      var tn = lv.nextSibling;
+      if(tn && tn.nodeType === 3){
+        if(tn.nodeValue !== p.updated) tn.nodeValue = p.updated;
+      } else {
+        ck.innerHTML = '<i class="live"></i>' + p.updated;
+      }
+    }
+  }
+
+  // 站点行：只动「车」那个标记，行本身（含 data-sel、滚动位置）一律不碰
+  if(win && win.rows){
+    for(var i = 0; i < win.rows.length; i++){
+      var r = win.rows[i];
+      var row = card.querySelector('.swrow[data-i="' + r.i + '"]');
+      if(!row) continue;
+      if(!!r.bus !== row.classList.contains("bus")) row.classList.toggle("bus", !!r.bus);
+      var tb = row.querySelector(".tb");
+      if(r.bus && !tb){
+        var sp = document.createElement("span");
+        sp.className = "tb";
+        sp.textContent = "车";
+        row.appendChild(sp);
+      } else if(!r.bus && tb){
+        row.removeChild(tb);
+      }
+    }
+  }
+
+  // 列表上方那句话。正在看某一站的到站时间时不动它，否则会把估算条顶掉
+  var ab = document.getElementById("swabove");
+  if(ab && !ab.classList.contains("hot")) ab.textContent = aboveText(win);
+
+  window._win = win;
+  window._winKey = main.line + "/" + main.dir;
+
+  // 选中了某站：用新数据重算那一行，再问一次上游把分钟数校准
+  if(_picked){
+    var sel = card.querySelector('.swrow[data-sel="1"]');
+    if(sel){ fillEta(sel); etaFetch(sel); }
+    else { _picked = null; }
+  }
+
+  _watch = {line: line, dir: dir, station: p.station};
+  syncWatch();
+  checkRemind(main);
+  return true;
+}
+
+/* 把站点列表滚到合适的位置：
+   - 车在我上方 5 站以内 → 连车那行一起带进视野，老人真正想知道的是车开到哪了
+   - 车更远或已经过站 → 以「你在这」为锚，上方留一行半
+   用 getBoundingClientRect 算，不用 offsetTop —— offsetParent 会算错。 */
+function centerMyStop(){
+  var box = document.getElementById("swscroll");
+  if(!box) return;
+  var me = box.querySelector(".swrow.mine");
+
+  // 这条线不经过我的站：没有「你在这」，就把视野滚到最近一辆车那儿
+  if(!me){
+    var anyBus = box.querySelector(".swrow.bus");
+    if(anyBus){
+      var d0 = anyBus.getBoundingClientRect().top - box.getBoundingClientRect().top;
+      box.scrollTop = Math.max(0, box.scrollTop + d0 - box.clientHeight * 0.30);
+    }
+    return;
+  }
+
+  var rowH = me.offsetHeight || 46;
+  var anchor = me, pad = rowH * 1.5;
+  var busRow = box.querySelector(".swrow.bus");
+  if(busRow){
+    var gap = me.getBoundingClientRect().top - busRow.getBoundingClientRect().top;
+    if(gap > 0 && gap <= rowH * 5.5){ anchor = busRow; pad = rowH * 0.5; }
+  }
+
+  var delta = anchor.getBoundingClientRect().top - box.getBoundingClientRect().top;
+  var target = box.scrollTop + delta - pad;
+  // 对齐到整行：不对齐的话首行会卡在框边被切掉一半，看起来像和上面那行叠在一起
+  target = Math.round(target / rowH) * rowH;
+  box.scrollTop = Math.max(0, Math.min(target, box.scrollHeight - box.clientHeight));
+}
+
+/* 读屏用的整句描述：把一张卡的信息压成一句话 */
+function ariaText(m, station){
+  var t = m.line + " 往 " + (m.toShort || "");
+  if(m.status === "noroute") t += "，这条线不经过" + (station || "这") + "站";
+  else if(m.status === "here") t += "，车已经到站";
+  else if(m.status === "coming" && m.minutes !== null){
+    t += "，还有 " + m.minutes + " 分钟";
+    if(m.stations !== null) t += "，" + m.stations + " 站";
+  }
+  else if(m.status === "waiting") t += "，等待发车";
+  else if(m.status === "closed") t += "，已经收班";
+  else t += "，暂时没有车";
+  return t;
+}
+
+function mainSpeech(main, other){
+  var t = "往"+main.toShort+"，";
+  if(main.status==="noroute") t += "这条线不经过这站";
+  else if(main.status==="here") t += "车在站上";
+  else if(main.status==="coming" && main.minutes!==null) t += (main.minutes===0?"车马上到":"还有"+main.minutes+"分钟");
+  else if(main.status==="waiting") t += "等发车";
+  else if(main.status==="closed") t += "已收班";
+  else t += "暂无车";
+  if(other){
+    t += "。反方向";
+    if(other.status==="coming" && other.minutes!==null) t += (other.minutes===0?"车马上到":"还有"+other.minutes+"分钟");
+    else if(other.status==="closed") t += "已收班";
+    else t += "暂无车";
+  }
+  return t;
+}
+
+/* ---------------------------------------------- 点站点，看车多久到
+   只改显示：不发请求、不动主数字、不新增块 —— 顶部「车现在在 X」那行就地变成估算，
+   列表高度不变，所以不会跳。老人误触也就是多出一行，点 × 就回去了。 */
+var _picked = null;      // {i, line, dir}：卡片每 15 秒重画一次，选中要能活过刷新
+
+function pickStop(el){
+  if(!el) return;
+  var box = document.getElementById("swscroll");
+  if(!box) return;
+
+  var on = el.getAttribute("data-sel") === "1";
+  var rows = box.querySelectorAll(".swrow");
+  for(var i = 0; i < rows.length; i++){
+    rows[i].removeAttribute("data-sel");
+    rows[i].className = rows[i].className.replace(" sel", "");
+  }
+  if(on){ _picked = null; fillEta(null); return; }    // 再点一次就取消
+
+  var r = rowOf(el);
+  if(!r) return;
+  _picked = {i: r.i, key: window._winKey || ""};
+  el.setAttribute("data-sel", "1");
+  el.className += " sel";
+  fillEta(el);        // 先用本地算的，立刻有数
+  etaFetch(el);       // 再问一次这一站，用真实到站覆盖
+}
+
+/* 问上游这一站的实时到站。点得快时只认最后一次，旧响应直接丢掉 */
+var _etaSeq = 0;
+
+function etaFetch(el){
+  var r = rowOf(el);
+  if(!r || !window._winKey) return;
+  if(r.mine) return;                       // 就是我这站，主数字已经准了
+  if(window.__DATA__) return;              // 离线演示页没有接口，用本地估算就够了
+  var parts = window._winKey.split("/");
+  var seq = ++_etaSeq;
+
+  api("/api/eta?line=" + encodeURIComponent(parts[0])
+      + "&dir=" + encodeURIComponent(parts[1])
+      + "&station=" + encodeURIComponent(r.name))
+  .then(function(p){
+    if(seq !== _etaSeq) return;            // 已经点了别的站
+    if(!p || !p.ok){
+      r.status = "noroute";
+      if(el.getAttribute("data-sel") === "1") fillEta(el);
+      return;
+    }
+    r.status = p.status;
+    r.eta = p.minutes;
+    r.left = p.stations;
+    r.passed = (p.status === "passed");
+    if(el.getAttribute("data-sel") === "1") fillEta(el);
+  })
+  .catch(function(){});
+}
+
+function rowOf(el){
+  var i = parseInt(el.getAttribute("data-i"), 10);
+  var rows = (window._win && window._win.rows) || [];
+  for(var k = 0; k < rows.length; k++){
+    if(rows[k].i === i) return rows[k];
+  }
+  return null;
+}
+
+function fillEta(el){
+  var bar = document.getElementById("swabove");
+  if(!bar) return;
+
+  if(!el){
+    var rest = (window._win && window._win.busHere)
+      ? '车现在在 ' + esc(window._win.busHere) + ' · 点站点看多久到'
+      : '点站点看车多久到';
+    if(bar.className !== "swabove") bar.className = "swabove";
+    if(bar.innerHTML !== rest) bar.innerHTML = rest;   // 没变就别写，写了就闪
+    return;
+  }
+
+  var r = rowOf(el);
+  if(!r) return;
+
+  /* 上游的 status 优先于本地的「已过站」判断 —— 本地说的是当前这班车开过去了，
+     上游回答的是「最近一班什么时候到这一站」，后者才是老人问的事。 */
+  var st = r.status || "";
+  var tail;
+  if(st === "passed"){
+    tail = '<b class="t">车已过站</b><span class="x">等下一班</span>';
+  } else if(st === "closed"){
+    tail = '<b class="t">今天收班了</b><span class="x">明天再来</span>';
+  } else if(st === "waiting"){
+    tail = '<b class="t">车还没发车</b><span class="x">等发车</span>';
+  } else if(st === "here"){
+    tail = '<b class="t">车在站上</b><span class="x">快上车</span>';
+  } else if(st === "noroute"){
+    tail = '<b class="t">查不到</b><span class="x">这站没车</span>';
+  } else if(r.passed){
+    tail = '<b class="t">车已过站</b><span class="x">等下一班</span>';
+  } else if(r.eta !== null && r.eta !== undefined){
+    tail = '<b class="t">约 ' + r.eta + ' 分钟</b><span class="x">· ' + r.left + ' 站</span>';
+  } else if(r.left !== null && r.left !== undefined){
+    tail = '<b class="t">还有 ' + r.left + ' 站</b><span class="x">无实时车</span>';
+  } else {
+    tail = '<b class="t">正在查…</b><span class="x">马上好</span>';
+  }
+
+  var nh = '<span class="to">到 ' + esc(r.name) + '</span>' + tail
+         + '<button class="bx" onclick="clearStop(event)" aria-label="取消选中">×</button>';
+  // 15 秒刷新会重算这一行；分钟数没变时整段重写就是白闪一下，所以先比字符串
+  if(bar.className !== "swabove hot") bar.className = "swabove hot";
+  if(bar.innerHTML !== nh) bar.innerHTML = nh;
+}
+
+function clearStop(e){
+  if(e && e.stopPropagation) e.stopPropagation();
+  _picked = null;
+  var box = document.getElementById("swscroll");
+  if(box){
+    var s = box.querySelector('.swrow[data-sel="1"]');
+    if(s){ s.className = s.className.replace(" sel", ""); s.removeAttribute("data-sel"); }
+  }
+  fillEta(null);
+}
+
+/* 刷新后把选中接回来，并把视野停在那一站，别让老人重新找 */
+function restorePick(){
+  if(!_picked) return;
+  var box = document.getElementById("swscroll");
+  if(!box) return;
+  var el = box.querySelector('.swrow[data-i="' + _picked.i + '"]');
+  if(!el) return;
+  el.setAttribute("data-sel", "1");
+  el.className += " sel";
+  fillEta(el);
+  etaFetch(el);       // 15 秒刷新过一轮，这一站的数也要重问
+
+  var rowH = el.offsetHeight || 46;
+  var delta = el.getBoundingClientRect().top - box.getBoundingClientRect().top;
+  var target = box.scrollTop + delta - box.clientHeight * 0.4;
+  box.scrollTop = Math.max(0, Math.min(Math.round(target / rowH) * rowH,
+                                       box.scrollHeight - box.clientHeight));
+}
+
+/* 卡片中间那块（大数字 / 状态文字）单独抽出来。
+   抽出来不是为了复用，是为了静默刷新时能只换这一块，不动下面的站点列表。 */
+function midInner(main, station){
+  var cls = main.dir==="1" ? "up" : "dn";
+  var urgent = (main.status==="coming" && main.minutes!==null && main.minutes<=3);
+  var s = "";
+  if(main.status==="noroute"){
+    s += '<div class="stxt '+cls+'" style="font-size:30px;line-height:1.25">不经过 '+esc(station)+'站</div>'
+       + '<div class="sub">下面是全程站点和车开到哪了</div>';
+  } else if(main.status==="here"){
+    s += '<div class="stxt '+cls+'">车在站上</div><div class="sub">快上车</div>';
+  } else if(main.status==="coming" && main.minutes!==null){
+    if(main.minutes===0){
+      s += '<div class="stxt '+cls+'">马上到</div><div class="sub"><b class="go">快上车</b>车就在附近</div>';
+    } else {
+      s += '<div class="main"><span class="min '+cls+'">'+main.minutes+'</span>'
+         + '<span class="unit '+cls+'">分钟</span></div>'
+         + '<div class="sub">'+(urgent?'<b class="go">该出门了</b> · ':'')
+         + '还有 <b>'+(main.stations!==null?main.stations+" 站":"几站")+'</b></div>';
+    }
+  } else if(main.status==="waiting"){
+    s += '<div class="stxt '+cls+'">等发车</div><div class="sub">'+esc(main.dist)+'</div>';
+  } else if(main.status==="closed"){
+    s += '<div class="stxt '+cls+'">已收班</div><div class="sub">明天再来</div>';
+  } else {
+    s += '<div class="stxt '+cls+'">'+esc(main.node||"暂无车")+'</div>';
+  }
+  return s;
+}
+
+/* 站点列表上方那句话。返回纯文本，调用方自己决定 esc() 还是 textContent */
+function aboveText(win){
+  return (win && win.busHere)
+    ? '车现在在 ' + win.busHere + ' · 点站点看多久到'
+    : '点站点看车多久到';
+}
+
+function homeCard(main, other, win, station){
+  station = station || HOME_STATION;
+  var cls = main.dir==="1" ? "up" : "dn";
+  var urgent = (main.status==="coming" && main.minutes!==null && main.minutes<=3);
+  var h = '<div class="card '+cls+(urgent?' urgent':'')+'">';
+
+  var swapHtml = "";
+  if(other){
+    var otxt = "暂无车";
+    if(other.status==="coming" && other.minutes!==null){
+      otxt = (other.minutes===0?"马上到":other.minutes+"分");
+    } else if(other.status==="here"){ otxt = "在站上"; }
+    else if(other.status==="waiting"){ otxt = "等发车"; }
+    else if(other.status==="closed"){ otxt = "已收班"; }
+    // 只写动作，不写反方向的终点和分钟 —— 宽度留给「往 XX」，
+    // 不然像「往 浙江东方学院」这种长站名会被拆成「…学」「院」两行
+    swapHtml = '<button class="swapbtn" aria-label="换到往' + esc(other.toShort) + '的方向，' + otxt + '" '
+             + 'onclick="swapDir(\'' + other.dir + '\',\'' + esc(main.line) + '\',\'' + esc(station) + '\')">'
+             + '<span class="si">⇄</span> 换方向</button>';
+  }
+
+  h += '<div class="ctop"><span class="lineno '+cls+'">'+esc(main.line)+'</span>'
+     + '<span class="toward">往 <b>'+esc(main.toShort)+'</b></span>'
+     + swapHtml + '</div>';
+
+  h += '<div class="cmid" role="img" aria-label="' + esc(ariaText(main, station)) + '">'
+     + midInner(main, station) + '</div>';
+
+    if(win && win.rows && win.rows.length){
+    h += '<div class="swin">';
+    h += '<div class="swabove" id="swabove">' + esc(aboveText(win)) + '</div>';
+    h += '<div class="swscroll" id="swscroll">';
+    for(var wi = 0; wi < win.rows.length; wi++){
+      var r = win.rows[wi];
+      h += '<div class="swrow' + (r.mine ? ' mine' : '') + (r.bus ? ' bus' : '') + '"'
+         + ' data-i="' + r.i + '" onclick="pickStop(this)">'
+         + '<span class="d"></span>'
+         + '<span class="n">' + esc(r.name) + '</span>'
+         + (r.mine ? '<span class="tm2">你在这</span>' : '')
+         + (r.bus ? '<span class="tb">车</span>' : '')
+         + '</div>';
+    }
+    h += '</div></div>';
+    window._win = win;
+    window._winKey = main.line + "/" + main.dir;
+  }
+
+  var remTxt = remAt() ? ('响铃中 · ' + remAt() + ' 站') : '到站响铃';
+  var remCls = remAt() ? 'remlink on' : 'remlink';
+  var remHtml = '<button class="' + remCls + '" aria-pressed="' + (remAt() ? 'true' : 'false')
+              + '" onclick="openSheet()">'
+              + remTxt + '</button>';
+  h += '<div class="cfoot"><span>' + (win ? '全程 ' + win.total + ' 站' : '') + '</span>' + remHtml + '</div>';
+  h += '</div>';
+  return h;
+}
+
+/* 换反方向：换的是同一张卡片的方向，不是回首页重新选。
+   用 replace 不新增历史 —— 否则连点几次换方向，返回要按好几下才回得到首页。 */
+function swapDir(d, line, station){
+  ls("prefDir", d);
+  if(line){
+    location.replace('#/b/' + encodeURIComponent(line) + '/' + d
+      + '?st=' + encodeURIComponent(station || HOME_STATION));
+  } else {
+    viewHome();
+  }
+}
+
+function toggleSpeak(){
+  speakOn = !speakOn;
+  var b = document.getElementById("spk");
+  if(b){ b.textContent = speakOn?"自动念 ✓":"念一遍"; b.className = "btn "+(speakOn?"on":"p"); }
+  if(speakOn && window._speech){ speak(window._speech); }
+}
+
+function errBox(t, m){
+  return '<div class="err"><h3>'+esc(t)+'</h3><p>'+esc(m||"稍后再试")+'</p></div>';
+}
+
+function viewStation(name){
+  var el = document.getElementById("app");
+  el.innerHTML = '<div class="nav"><button class="back" onclick="back()">‹ 返回</button>'
+    + '<span class="t">'+esc(name)+'</span></div><div class="scroll"><div class="loading">正在查…</div></div>';
+  api("/api/station?name="+encodeURIComponent(name)).then(function(p){
+    if(!p.ok){ el.innerHTML = errBox("查不到这个站", p.error); return; }
+    var lines = p.lines || [];
+    if(!lines.length){ el.innerHTML = errBox("这个站没有线路", "换个站试试"); return; }
+
+    var LIMIT = 6;
+    var html = '<div class="nav"><button class="back" onclick="back()">‹ 返回</button>'
+             + '<span class="t">'+esc(p.station)+'</span>'
+             + '<button class="favbtn" id="favbtn" data-st="'+esc(p.station)+'" '
+             + 'onclick="toggleFave(this.getAttribute(\'data-st\'))">☆</button>'
+             + '<button class="navlink" onclick="go(\'#/search\')">换站 ›</button></div>';
+
+    html += '<div class="scroll flush"><div class="sec" style="padding:12px 16px 6px">'
+          + '有车的排在前面</div>';
+    html += '<div id="lst">';
+    html += '<div id="lst">' + stationRows(lines, name, LIMIT) + '</div>';
+    if(lines.length > LIMIT){
+      html += '<div class="more" id="more" onclick="showMore()">还有 '+(lines.length-LIMIT)+' 条线，点这里看 ›</div>';
+    }
+    html += '<div class="tip">更新于 '+p.updated+'</div></div>';
+    el.innerHTML = html;
+    var fb = document.getElementById("favbtn");
+    if(fb) setFavBtn(fb, p.station);
+  }).catch(function(){ el.innerHTML = errBox("连不上", "稍后再试"); });
+}
+
+function showMore(){
+  var rows = document.querySelectorAll('[data-late="1"]');
+  for(var i=0;i<rows.length;i++){ rows[i].style.display="flex"; }
+  var m = document.getElementById("more");
+  if(m) m.style.display="none";
+}
+
+function viewSearch(kwArg){
+  var el = document.getElementById("app");
+  if(kwArg) window._kw = kwArg;
+  var kw = window._kw || "";
+  el.innerHTML = '<div class="nav"><button class="back" onclick="back()">‹ 返回</button>'
+    + '<span class="t">查线路</span></div>'
+    + '<div class="sbar"><input id="kw" class="sinput" type="search" inputmode="search" '
+    + 'placeholder="输线路号，比如 36" value="' + esc(kw) + '" '
+    + 'onkeydown="if(event.key===\'Enter\'){event.preventDefault();doSearch();}">'
+    + '<button class="sbtn" onclick="doSearch()">搜</button></div>'
+    + '<div class="scroll" id="sres"></div>';
+  if(kw){ doSearch(); }
+  else {
+    document.getElementById("sres").innerHTML =
+      '<div class="panel"><div class="sec">输线路号或站名，比如 36、159、石坦</div></div>';
+  }
+  // 从首页点进来的话位置已经有了；直接开搜索页（深链、刷新）则没有，
+  // 补一次定位，拿到后自动重搜一遍，结果就带上距离了。
+  if(_near.lat == null && kw){
+    locate(function(v){
+      if(!v) return;
+      _near.lat = v.lat; _near.lon = v.lon;
+      if(document.getElementById("kw")) doSearch();
+    });
+  }
+  var inp = document.getElementById("kw");
+  if(inp && !kw){ setTimeout(function(){ inp.focus(); }, 120); }
+}
+
+function doSearch(){
+  var kw = (document.getElementById("kw").value || "").trim();
+  if(!kw) return;
+  window._kw = kw;
+  var box = document.getElementById("sres");
+  box.innerHTML = '<div class="loading">正在搜…</div>';
+  // 知道自己在哪儿就带上，同名的站会按远近排
+  var q = "/api/search?kw=" + encodeURIComponent(kw);
+  if(_near.lat != null && _near.lon != null){
+    q += "&lat=" + _near.lat + "&lon=" + _near.lon;
+  }
+  api(q).then(function(p){
+    if(!p.ok){ box.innerHTML = errBox("搜不了", p.error); return; }
+    var h = "";
+    var lines = p.lines || [], stations = p.stations || [];
+    if(lines.length){
+      var lt = p.linesTotal || lines.length;
+      h += '<div class="sec">线路 ' + (lt > lines.length ? lines.length + ' / 共 ' + lt + ' 条' : lines.length + ' 条') + '</div>';
+      for(var i = 0; i < lines.length; i++){
+        var v = lines[i];
+        if(v.dirs && v.dirs.length > 1){
+          // 线路号精确命中的，两个方向直接摊开 —— 点了就是那张到站卡片
+          for(var j = 0; j < v.dirs.length; j++){
+            var dd = v.dirs[j];
+            var hr = '#/b/' + encodeURIComponent(v.line) + '/' + dd.dir;
+            h += '<div class="row srow" onclick="go(\'' + hr + '\')">'
+               + '<span class="ln">' + esc(v.line) + '</span>'
+               + '<span class="dst">往 <b>' + esc(dd.toShort) + '</b>'
+               + '　<span class="dstop">' + dd.stopCount + ' 站</span></span>'
+               + '<span class="arrow">›</span></div>';
+          }
+        } else {
+          // 同名的其他线路：只列一行，点进去再选方向
+          var href = '#/d/' + encodeURIComponent(v.line);
+          h += '<div class="row srow" onclick="go(\'' + href + '\')">'
+             + '<span class="ln">' + esc(v.line) + '</span>'
+             + '<span class="dst">' + esc(v.from) + ' → ' + esc(v.to) + '</span>'
+             + '<span class="arrow">›</span></div>';
+        }
+      }
+    }
+    if(stations.length){
+      var st = p.stationsTotal || stations.length;
+      h += '<div class="sec">站点 ' + (st > stations.length ? stations.length + ' / 共 ' + st + ' 个' : stations.length + ' 个') + '</div>';
+      for(var j = 0; j < stations.length; j++){
+        var s = stations[j];
+        var sh = '#/s/' + encodeURIComponent(s.name);
+        // 站名照原样显示 —— 「人民医院（洞头）」和「人民医院」得看得出区别，
+        // 短名会把括号里的区县也砍掉，反而分不清。
+        // 跳转也用原名：站牌页要拿它去查线路。
+        var ds = "";
+        if(s.dist != null){
+          ds = s.dist < 1000 ? (s.dist + " 米") : ((s.dist / 1000).toFixed(1) + " 公里");
+        }
+        h += '<div class="row strow" onclick="go(\'' + sh + '\')">'
+           + '<span class="ln">'
+           + esc(s.name)
+           + (ds ? '　<span class="dstop">' + ds + '</span>' : '')
+           + '</span><span class="arrow">›</span></div>';
+      }
+    }
+    if(p.skipped){
+      h += '<div class="sec">另有 ' + p.skipped + ' 条线路没有实时到站数据，已隐藏</div>';
+    }
+    if((p.linesTotal || 0) > lines.length || (p.stationsTotal || 0) > stations.length){
+      h += '<div class="sec">结果比较多，只列出最相近的几条。把线路号或站名输完整一些更准</div>';
+    }
+    if(!h){
+      h = '<div class="sec">没搜到。站名要写全 —— '
+        + '比如温州不叫「火车站」，叫「火车温州站」</div>';
+    }
+    box.innerHTML = '<div class="panel">' + h + '</div>';
+  }).catch(function(){ box.innerHTML = errBox("连不上", "稍后再试"); });
+}
+
+/* 返回：优先回上一页，没有上一页才回首页。
+   以前一律回首页，从站牌页点进来再返回就丢了原来的站位。 */
+function back(){
+  if(history.length > 1){ history.back(); }
+  else { go('#/'); }
+}
+
+/* 选方向 —— 只有「知道坐几路、不知道往哪边开」的时候才走这一页。
+   从站牌页点进来的人，那一行本来就写了「往 浙南科技城 还有 3 分钟」，
+   方向已经选完了，不会再经过这里。 */
+function viewDirs(line, from){
+  var el = document.getElementById("app");
+  el.innerHTML = '<div class="loading">正在查这条线…</div>';
+  api("/api/dirs?line=" + encodeURIComponent(line) + "&from=" + encodeURIComponent(from||""))
+  .then(function(p){
+    if(!p.ok || !p.dirs || !p.dirs.length){
+      el.innerHTML = errBox("查不到这条线", p.error || "换个线路号试试"); return;
+    }
+
+    // 环线之类只有一个方向，就别让他白选一次
+    if(p.dirs.length === 1){
+      go('#/l/' + encodeURIComponent(p.line) + '/' + p.dirs[0].dir
+         + '?f=' + encodeURIComponent(from||""));
+      return;
+    }
+
+    var html = '<div class="nav"><button class="back" onclick="back()">‹ 返回</button>'
+             + '<span class="t">'+esc(p.line)+'</span></div>';
+
+    html += '<div class="scroll">';
+    html += '<div class="dhint">'
+          + (from ? '从'+esc(from)+'上车，选往哪边开' : '选往哪边开')
+          + '</div>';
+
+    for(var i=0;i<p.dirs.length;i++){
+      var v = p.dirs[i];
+      var href = '#/l/' + encodeURIComponent(p.line) + '/' + v.dir
+               + '?f=' + encodeURIComponent(from||"");
+      var live = "";
+      if(v.minutes !== null && v.minutes !== undefined){
+        live = '<span class="dmin">' + (v.minutes === 0 ? "马上到" : v.minutes + " 分钟") + '</span>';
+        if(v.stations) live += '<span class="dst2">还有 ' + v.stations + ' 站</span>';
+      } else if(v.busCount){
+        live = '<span class="dnum">' + v.busCount + ' 辆车在路上</span>';
+      } else if(!v.hasReal){
+        live = '<span class="dnum">这条线没有实时数据</span>';
+      }
+
+      html += '<div class="dircard" onclick="go(\''+href+'\')">'
+            + '<div class="dto"><span class="dtoward">往</span>'+esc(v.toShort)+'</div>'
+            + '<div class="dmeta">共 '+v.stopCount+' 站'
+            + (v.begin ? '　'+esc(v.begin)+'–'+esc(v.end) : '') + '</div>'
+            + (live ? '<div class="dlive">'+live+'</div>' : '')
+            + '</div>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  }).catch(function(){ el.innerHTML = errBox("连不上", "检查电脑上的程序是否还在运行"); });
+}
+
+function viewLine(line, dir, focus){
+  var el = document.getElementById("app");
+  el.innerHTML = '<div class="loading">正在查线路…</div>';
+  api("/api/line?name="+encodeURIComponent(line)+"&dir="+dir+"&focus="+encodeURIComponent(focus||""))
+  .then(function(p){
+    if(!p.ok || !p.stops || !p.stops.length){
+      el.innerHTML = errBox("查不到这条线", p.error); return;
+    }
+    var other = dir==="1" ? "2" : "1";
+    var stopMap = {};
+    for(var i=0;i<p.buses.length;i++){
+      if(p.focus && p.buses[i].index >= p.focus) continue;
+      stopMap[p.buses[i].index] = p.buses[i];
+    }
+
+    var hrefSwap = '#/l/' + encodeURIComponent(p.line) + '/' + other + '?f=' + encodeURIComponent(focus||"");
+    var meta = [];
+    if(p.begin) meta.push('首班 ' + p.begin);
+    if(p.end) meta.push('末班 ' + p.end);
+    meta.push('共 ' + p.stops.length + ' 站');
+
+    var html = '<div class="nav"><button class="back" onclick="back()">‹ 返回</button>'
+             + '<span class="t">'+esc(p.line)+'</span></div>';
+
+    html += '<div class="lhead"><div class="lh1">'
+          + '<div class="lh2">往 <b>'+esc(p.toShort)+'</b></div>'
+          + '<button class="swap" onclick="go(\''+hrefSwap+'\')">⇄ 换个方向</button></div>'
+          + '<div class="lh3">'+esc(meta.join('　'))+'</div>'
+          + (p.hasReal ? '' : '<div class="noreal">这条线没有实时到站数据，只能看站点顺序</div>')
+          + '</div>';
+
+    html += '<div class="scroll flush">';
+    html += '<div class="tl">';
+    for(var i=0;i<p.stops.length;i++){
+      var s = p.stops[i];
+      var mine = (p.focus && s.i === p.focus);
+      var bus = stopMap[s.i];
+      var dotcls = "dot" + (mine?" mine":"") + (bus?" bus":"");
+      var rowcls = "stop" + (mine?" mine":"") + (bus?" busrow":"");
+      html += '<div class="'+rowcls+'" id="s'+s.i+'">'
+            + '<div class="rail"></div>'
+            + '<div class="'+dotcls+'"></div>'
+            + '<div class="sname'+(mine?" mine":"")+'">'+esc(s.name)+'</div>';
+      if(mine) html += '<span class="tagme">你在这</span>';
+      if(bus)  html += '<span class="tagbus">车</span>';
+      html += '</div>';
+    }
+    html += '</div>';
+    html += '<div class="tip">更新于 '+p.updated+'　'
+          + (p.hasReal ? ('在途 '+p.buses.length+' 辆') : '暂无实时数据') + '</div>';
+    html += '</div>';
+    el.innerHTML = html;
+
+    if(p.focus){
+      var node = document.getElementById("s"+p.focus);
+      if(node){
+        setTimeout(function(){
+          var sc = el.querySelector(".scroll");
+          var top = node.offsetTop - sc.clientHeight/2 + node.offsetHeight/2;
+          sc.scrollTop = Math.max(0, top);
+        }, 60);
+      }
+    }
+  }).catch(function(){ el.innerHTML = errBox("连不上", "稍后再试"); });
+}
+
+function route(){
+  var h = location.hash || "#/";
+  var el = document.getElementById("app");
+  if(timer){ clearInterval(timer); timer = null; }
+
+  var q = "";
+  var qi = h.indexOf("?");
+  if(qi >= 0){ q = h.slice(qi+1); h = h.slice(0,qi); }
+  var params = {};
+  q.split("&").forEach(function(kv){
+    if(!kv) return; var a = kv.split("=");
+    params[decodeURIComponent(a[0])] = decodeURIComponent(a[1]||"");
+  });
+
+  var parts = h.replace(/^#\/?/, "").split("/");
+
+  if(parts[0] === "" ){ viewHome(); timer = setInterval(viewHome, 20000); return; }
+  if(parts[0] === "s"){ viewStation(decodeURIComponent(parts[1]||"")); timer = setInterval(function(){ viewStation(decodeURIComponent(parts[1]||"")); }, 20000); return; }
+  if(parts[0] === "b"){
+    var bl = decodeURIComponent(parts[1]||""), bd = parts[2]||"1", bs = params.st||"";
+    viewBoard(bl, bd, bs);
+    // 第四个参数 true = 静默刷新：只贴数据，不重画整页
+    timer = setInterval(function(){ viewBoard(bl, bd, bs, true); }, 15000);
+    return;
+  }
+  if(parts[0] === "d"){ viewDirs(decodeURIComponent(parts[1]||""), params.from || ""); return; }
+  if(parts[0] === "l"){ viewLine(decodeURIComponent(parts[1]||""), parts[2]||"1", params.f||""); return; }
+  if(parts[0] === "search"){ viewSearch(params.kw || ""); return; }
+
+  viewHome();
+}
+
+/* 手机浏览器要求先有一次点击才允许出声。进来先建好，点屏幕任意处解锁 */
+initAudio();
+document.addEventListener("pointerdown", function(){
+  initAudio();
+  if(window._ac && window._ac.state === "suspended"){
+    try{ window._ac.resume(); }catch(e){}
+  }
+}, {passive:true});
+
+/* 临时调试：?loc=27.96,120.74 直接给坐标，验证「已定位」那条路径。
+   WebView 和局域网 http 都拿不到真的定位，只能这样测。测完删。 */
+if(location.search.indexOf("loc=") >= 0){
+  (function(){
+    var m = location.search.match(/loc=([-0-9.]+),([-0-9.]+)/);
+    if(!m) return;
+    window.__forceLoc = {lat: parseFloat(m[1]), lon: parseFloat(m[2])};
+  })();
+}
+
+window.addEventListener("hashchange", route);
+route();
+
+/* 按压反馈：移动端 WebView 里纯 CSS :active 经常不触发 —— 浏览器要等你抬手
+   判完是点击还是滑动才决定要不要算「按下」。所以按下就加 .down，抬起或划走
+   都去掉。用事件委托，动态生成的按钮一样管用。
+   （早先只写了 .btn:active，而且误加在深色皮肤那段，白卡根本没这条，
+   点了没有任何反应。这是实装遗漏，不是缓存问题。） */
+(function(){
+  var cur = null;
+  function clear(){
+    if(cur){ cur.classList.remove("down"); cur = null; }
+  }
+  // 按下过、还没跳转的那个元素。给 go() 用：先给它亮一下，让「点中了」被看见。
+  function mark(t){
+    window._lastTap = t;
+    // 按下却没产生点击（拖走、被别的元素吃掉）时别留残影，900ms 后自己作废
+    setTimeout(function(){ if(window._lastTap === t) window._lastTap = null; }, 900);
+  }
+  document.addEventListener("pointerdown", function(e){
+    var t = e.target;
+    while(t && t !== document.body){
+      var c = t.classList;
+      if(c && (c.contains("btn") || c.contains("opt") || c.contains("th")
+            || c.contains("row") || c.contains("dircard") || c.contains("swall")
+            || c.contains("rg") || c.contains("favtog") || c.contains("favbtn"))){
+        clear(); cur = t; t.classList.add("down"); mark(t); break;
+      }
+      t = t.parentNode;
+    }
+  }, {passive:true});
+  // 抬手只去掉按下态，_lastTap 要留到随后的 click —— go() 靠它找到被点的行
+  document.addEventListener("pointerup", clear, {passive:true});
+  document.addEventListener("pointercancel", function(){
+    clear(); window._lastTap = null;
+  }, {passive:true});
+  document.addEventListener("scroll", function(){
+    clear(); window._lastTap = null;
+  }, {passive:true, capture:true});
+})();
+
+
+
+/* 调试用：地址加 ?sheet=1 直接弹出设置面板，方便截图核对。
+   ?sheet=now 连滑入动画一起去掉 —— 无头浏览器截图会卡在动画中间。 */
+if(location.search.indexOf("sheet=") >= 0){
+  setTimeout(function(){
+    try{
+      if(location.search.indexOf("sheet=now") >= 0){
+        var sh = document.getElementById("sheet");
+        if(sh) sh.style.transition = "none";
+      }
+      openSheet();
+    }catch(e){}
+  }, 2600);
+}
+
+/* 调试用：地址加 ?pick=站序 自动选中那一站，方便截图核对估算条
+   （只点一次 —— pickStop 是开关，点两下就取消了） */
+(function(){
+  var m = location.search.match(/[?&]pick=(\d+)/);
+  if(!m) return;
+  var hit = false;
+  var t = setInterval(function(){
+    if(hit) return;
+    var row = document.querySelector('.swrow[data-i="' + m[1] + '"]');
+    if(row){ hit = true; clearInterval(t); pickStop(row); }
+  }, 250);
+  setTimeout(function(){ clearInterval(t); }, 9000);
+})();
+
+/* 调试用：地址加 ?autoskin=d 自动点一下那个配色，验证「换了就记住」整条链路 */
+(function(){
+  var m = location.search.match(/[?&]autoskin=([cde])/);
+  if(!m) return;
+  setTimeout(function(){ try{ setSkin(m[1]); }catch(e){} }, 2200);
+})();
+
+/* 装成 App 之后，响铃的那行说明要换掉 —— 后台也响是这个版本的主要卖点。
+   顺便在面板最下面露一行服务器地址，点一下能改。 */
+(function nativeUI(){
+  var B = bridge(); if(!B) return;
+  var l = document.getElementById("limitline");
+  if(l){
+    l.textContent = "切到后台、锁屏也会响";
+    l.style.cssText = "background:#EAF5EE;color:#1B7A46;border-color:#CDE6D8";
+  }
+  var s = document.getElementById("srvline");
+  if(s){
+    var addr = "";
+    try{ addr = B.server(); }catch(e){}
+    s.style.cssText = "margin-top:14px;padding-top:12px;border-top:1px solid #EFEEE8;"
+                    + "text-align:center;font-size:13px;color:#8A8F94;line-height:1.6";
+    s.textContent = addr
+      ? ("连电脑 " + addr + " · 点了能改")
+      : "自带数据 · 不连电脑也能用";
+    s.onclick = function(){ try{ B.settings(); }catch(e){} };
+  }
+})();

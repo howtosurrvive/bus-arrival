@@ -352,6 +352,18 @@ def fetch_platforms(station):
 # 所以「附近有哪些站」必须自己算。好在 CMD 103 的站表里直接带 station_lat/lon，
 # 一条线一次请求就能拿到全线站名和坐标 —— 看过哪条线，那条线的站就进库。
 STATION_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stations.json")
+
+# 「手机里自己算」那一版的前端（web/）。电脑上也能直接跑它，用来验证手机上
+# 的行为：/static/index.html 打开就是 App 里那个页面，/api/data 由下面转发。
+WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
+_WEB_MIME = {
+    ".html": "text/html; charset=utf-8",
+    ".js": "application/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".png": "image/png",
+    ".svg": "image/svg+xml",
+}
 _st_db = None
 _st_dirty = False
 
@@ -2681,12 +2693,27 @@ REMIND_DOM = (
 )
 
 
+def _web_file(rel):
+    """读 web/ 下的文件。读不到返回空串，让调用方退回内置常量。"""
+    try:
+        with open(os.path.join(WEB_DIR, rel), encoding="utf-8") as f:
+            return f.read()
+    except Exception:
+        return ""
+
+
 def page_html(skin="a", pwa=False):
     """按皮肤生成页面。skin 不认识时退回 a。
 
     pwa=True 时才挂 manifest 和主屏图标 —— 离线单文件（file://）挂这些只会报错。
     """
-    css = SKINS.get(skin) or SKINS.get("a") or CSS
+    # 前端只有一份真相：bus-app/web/ 。电脑上跑服务时也读那几个文件，
+    # 免得改了一边忘了另一边（手机里跑的是同一份 app.js）。
+    css = _web_file("skins/%s.css" % skin) or SKINS.get(skin) or SKINS.get("a") or CSS
+    js = _web_file("app.js")
+    if not js:
+        js = JS.replace("__HOME_STATION__", HOME_STATION) \
+               .replace("__HOME_LINE__", HOME_LINE)
     # 图标与状态栏底色跟着皮肤走，别让暖橘页面顶着深蓝图标
     theme = {"b": "#E9EAE4", "d": "#FFF8F1", "e": "#F6FAFF"}.get(skin, "#FAFAF7")
     icon_v = {"c": "deep", "d": "warm", "e": "sky"}.get(skin, "warm")
@@ -2707,8 +2734,7 @@ def page_html(skin="a", pwa=False):
             "<body data-sk=\"" + skin + "\" data-build=\"" + BUILD + "\">"
             "<div id=\"app\" style=\"flex:1;display:flex;flex-direction:column;"
             "overflow:hidden;min-height:0\"></div>" + REMIND_DOM +
-            "<script>" + JS.replace("__HOME_STATION__", HOME_STATION)
-            .replace("__HOME_LINE__", HOME_LINE) + "</script></body></html>")
+            "<script>" + js + "</script></body></html>")
 
 
 PAGE = page_html("c")
@@ -2874,6 +2900,30 @@ class Handler(BaseHTTPRequestHandler):
                     except ValueError:
                         lat = lon = None
                     self._json(build_search(kw, lat, lon))
+
+            elif path == "/api/data":
+                # 给 web/ 那一版（手机里自己算）当中转。
+                # 上游防盗链只认 Origin: https://h5.mygolbs.com，浏览器和 WebView
+                # 里 JS 改不了这个头（禁止修改），所以由壳替它加上 —— 电脑上是这里，
+                # 手机上是 WebView 的 shouldInterceptRequest。返回的东西完全一样。
+                params = {k: v[0] for k, v in urllib.parse.parse_qs(
+                    u.query, keep_blank_values=True).items()}
+                try:
+                    self._json(api_post(params))
+                except Exception as e:
+                    self._json({"status": "-1", "msg": str(e)[:120]})
+
+            elif path.startswith("/static/"):
+                rel = urllib.parse.unquote(path[len("/static/"):])
+                full = os.path.normpath(os.path.join(WEB_DIR, rel))
+                if not full.startswith(WEB_DIR) or not os.path.isfile(full):
+                    self._send(404, "not found", "text/plain; charset=utf-8")
+                else:
+                    ext = os.path.splitext(full)[1].lower()
+                    with open(full, "rb") as f:
+                        blob = f.read()
+                    self._send_bytes(200, blob,
+                                     _WEB_MIME.get(ext, "application/octet-stream"))
 
             elif path == "/icon.png":
                 try:

@@ -15,20 +15,13 @@ export PATH="$JDK/bin:$PATH"
 JAVA="$JDK/bin/java.exe"
 
 # 电脑的局域网地址，写进 App 当默认值（手机在同一 WiFi 下就免配置）
-DEF_IP="${1:-}"
-if [ -z "$DEF_IP" ]; then
-  DEF_IP=$(python -c "
-import socket
-s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-try:
-    s.connect(('223.5.5.5',80)); print(s.getsockname()[0])
-except Exception: print('')
-finally: s.close()" 2>/dev/null)
-fi
-DEF_SERVER=""
-[ -n "$DEF_IP" ] && DEF_SERVER="http://$DEF_IP:8765"
+# 默认不连电脑：App 里自带页面和站库，自己上网问上游，装在手机上就能用。
+# 想让 App 连电脑上的 server.py（家里 WiFi 更快、省流量），打包时把地址传进来：
+#   bash build.sh http://192.168.1.9:8765
+DEF_SERVER="${1:-}"
+DEF_SERVER="${DEF_SERVER%/}"
 
-echo "==> 默认服务器地址: ${DEF_SERVER:-（留空，装好后手填）}"
+echo "==> 运行方式: ${DEF_SERVER:-自带数据（不依赖电脑）}"
 
 rm -rf "$OUT"
 mkdir -p "$OUT/gen" "$OUT/classes" "$OUT/dex" "$OUT/src"
@@ -55,6 +48,19 @@ for f in src/com/leina/bus/*.java; do
   cp "$f" "$OUT/src/"
 done
 
+# 1.5 内置页面：assets/web 就是 App 里跑的那套（web 目录是唯一来源）
+#     先把由 Python 生成的那几个文件刷新一遍，免得打包打到旧的设置面板/配色
+(cd ../bus-app && python sync_web.py)
+rm -rf "$OUT/assets"
+mkdir -p "$OUT/assets"
+cp -r ../bus-app/web "$OUT/assets/web"
+echo "==> 内置页面: $(ls "$OUT/assets/web" | tr '\n' ' ')"
+echo "==> 内置站库: $(du -h "$OUT/assets/web/stations.json" 2>/dev/null | cut -f1)"
+
+# 版本戳写进页面：设置面板底部会显示，用来确认手机上拿到的是不是这一个包
+BUILD_TAG=$(date +"%m-%d %H:%M")
+sed -i "s|data-build=\"[^\"]*\"|data-build=\"$BUILD_TAG\"|" "$OUT/assets/web/index.html"
+
 # 2. 资源
 "$BT/aapt2.exe" compile --dir res -o "$OUT/res.zip"
 "$BT/aapt2.exe" link \
@@ -62,11 +68,12 @@ done
   -I "$ANDROID_JAR" \
   --manifest AndroidManifest.xml \
   -R "$OUT/res.zip" \
+  -A "$OUT/assets" \
   --java "$OUT/gen" \
   --min-sdk-version 21 \
   --target-sdk-version 34 \
-  --version-code 1 \
-  --version-name 1.0.0 \
+  --version-code 2 \
+  --version-name 1.1.0 \
   --auto-add-overlay
 echo "==> 资源编译完成"
 
@@ -114,19 +121,19 @@ fi
 "$JAVA" -jar "$BT/lib/apksigner.jar" sign \
   --ks "$KS" --ks-pass pass:bus123456 --key-pass pass:bus123456 \
   --v1-signing-enabled true --v2-signing-enabled true \
-  --out "$OUT/bus-1.0.0.apk" "$OUT/aligned.apk"
+  --out "$OUT/bus-1.1.0.apk" "$OUT/aligned.apk"
 
-"$JAVA" -jar "$BT/lib/apksigner.jar" verify "$OUT/bus-1.0.0.apk"
+"$JAVA" -jar "$BT/lib/apksigner.jar" verify "$OUT/bus-1.1.0.apk"
 echo "==> 签名校验通过"
 
 # 8. 归档到 dist/，并记下校验值与证书指纹（手机下载页要显示这两样）
 mkdir -p ../dist
-cp "$OUT/bus-1.0.0.apk" "../dist/bus-arrival-1.0.0.apk"
-"$JAVA" -jar "$BT/lib/apksigner.jar" verify --print-certs "../dist/bus-arrival-1.0.0.apk" > "$OUT/certs.txt"
+cp "$OUT/bus-1.1.0.apk" "../dist/bus-arrival-1.1.0.apk"
+"$JAVA" -jar "$BT/lib/apksigner.jar" verify --print-certs "../dist/bus-arrival-1.1.0.apk" > "$OUT/certs.txt"
 python - "$OUT" <<'PY'
 import hashlib, json, os, re, sys, datetime
 out = sys.argv[1]
-apk = os.path.join(os.path.dirname(out), "..", "dist", "bus-arrival-1.0.0.apk")
+apk = os.path.join(os.path.dirname(out), "..", "dist", "bus-arrival-1.1.0.apk")
 apk = os.path.abspath(apk)
 data = open(apk, "rb").read()
 cert = ""
@@ -136,7 +143,7 @@ for line in open(os.path.join(out, "certs.txt"), encoding="utf-8", errors="ignor
         break
 info = {
     "file": os.path.basename(apk),
-    "version": "1.0.0", "versionCode": 1,
+    "version": "1.1.0", "versionCode": 2,
     "size": len(data),
     "sha256": hashlib.sha256(data).hexdigest(),
     "cert": cert, "signed": "v1+v2",
@@ -172,4 +179,4 @@ except Exception as e:
     print("!! 同步 index.html 失败：", e)
 PY
 
-ls -lh "$OUT/bus-1.0.0.apk" ../dist/
+ls -lh "$OUT/bus-1.1.0.apk" ../dist/

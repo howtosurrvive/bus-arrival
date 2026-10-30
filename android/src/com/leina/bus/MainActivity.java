@@ -11,6 +11,7 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.InputType;
@@ -25,6 +26,7 @@ import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
@@ -34,6 +36,14 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 一个很薄的壳：里面就是那套网页，外面只多了两件事 ——
@@ -47,9 +57,17 @@ public class MainActivity extends Activity {
     private static final String BLUE = "#0E3A63";
     private static final String ORANGE = "#DA6B1C";
 
+    /* 页面整个住在 APK 里。bus.local 是假的域名 —— 不会真的解析，
+       所有请求都在 shouldInterceptRequest 里被接住。用 https 是为了让
+       WebView 当成安全上下文。 */
+    private static final String LOCAL_HOST = "bus.local";
+    private static final String LOCAL_HOME = "https://" + LOCAL_HOST + "/index.html";
+    private static final String UPSTREAM = "https://h5.mygolbs.com/ApiData.do";
+
     private Prefs prefs;
     private FrameLayout root;
     private WebView web;
+    private boolean triedAssetFallback = false;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -60,8 +78,9 @@ public class MainActivity extends Activity {
         root.setBackgroundColor(Color.parseColor(BG));
         setContentView(root);
 
-        if (prefs.server().isEmpty()) showSetup();
-        else openWeb();
+        // 默认就用装在手机里的那一套，不需要先填服务器地址。
+        // 想连电脑的人可以在设置里填（填了就会走电脑，老用户升级后也认）。
+        openWeb();
 
         // 手机重启过、或者 App 被系统清掉过：打开时把盯站服务接回来
         if (prefs.watchOn()) BusService.start(this);
@@ -84,6 +103,10 @@ public class MainActivity extends Activity {
             if (Build.VERSION.SDK_INT >= 21) {
                 s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
             }
+            // 兜底路径会用 file:// 直接打开 assets 里的页面，那时要读同目录的
+            // stations.json / app.js —— WebView 默认禁止 file:// 之间互相取文件
+            s.setAllowFileAccessFromFileURLs(true);
+            s.setAllowUniversalAccessFromFileURLs(true);
             web.setBackgroundColor(Color.parseColor(BG));
             web.setOverScrollMode(View.OVER_SCROLL_NEVER);
             web.addJavascriptInterface(new Bridge(), "AndroidBridge");
@@ -91,6 +114,31 @@ public class MainActivity extends Activity {
                 @Override
                 public boolean shouldOverrideUrlLoading(WebView v, String url) {
                     return false;   // 就一个站内页面，全部自己加载
+                }
+
+                /* bus.local 上的东西一律由这里供货：
+                   ① /api/data —— 替网页去问上游。上游有防盗链，只认
+                      Origin: https://h5.mygolbs.com，浏览器里 JS 改不了这个头
+                      （禁止修改的请求头），所以只能原生发；
+                   ② 其他 —— 从 assets/web 里读静态文件。
+                   这样就不需要电脑、也不需要任何服务器。 */
+                @Override
+                public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest req) {
+                    Uri u = req.getUrl();
+                    if (u == null || !LOCAL_HOST.equals(u.getHost())) return null;
+
+                    String path = u.getPath();
+                    if (path != null && path.startsWith("/api/data")) {
+                        Map<String, String> h = new HashMap<String, String>();
+                        h.put("Access-Control-Allow-Origin", "*");
+                        h.put("Cache-Control", "no-store");
+                        WebResourceResponse r = new WebResourceResponse(
+                                "application/json", "utf-8",
+                                new ByteArrayInputStream(fetchUpstream(u.getEncodedQuery())));
+                        r.setResponseHeaders(h);
+                        return r;
+                    }
+                    return serveAsset(path);
                 }
 
                 @Override
@@ -103,13 +151,23 @@ public class MainActivity extends Activity {
                 // Android 6 以后只会回调这个带请求信息的新版本，旧的 4 参版本不再触发
                 @Override
                 public void onReceivedError(WebView v, WebResourceRequest req, WebResourceError err) {
-                    if (req != null && req.isForMainFrame()) showOffline();
+                    if (req == null || !req.isForMainFrame()) return;
+                    // bus.local 是个假域名，正常都被 shouldInterceptRequest 接住。
+                    // 万一某台老机器的 WebView 没接住，直接去 assets 里打开 ——
+                    // 页面会以 file:// 跑，接口仍走绝对地址让原生代发。
+                    if (!triedAssetFallback && req.getUrl() != null
+                            && LOCAL_HOST.equals(req.getUrl().getHost())) {
+                        triedAssetFallback = true;
+                        v.loadUrl("file:///android_asset/web/index.html");
+                        return;
+                    }
+                    showOffline();
                 }
             });
         }
         root.removeAllViews();
         root.addView(web, new FrameLayout.LayoutParams(-1, -1));
-        web.loadUrl(prefs.server() + "/");
+        web.loadUrl(prefs.local() ? LOCAL_HOME : prefs.server() + "/");
 
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
@@ -120,12 +178,70 @@ public class MainActivity extends Activity {
         askLocPerm();
     }
 
+    /* ------------------------------------------------------- 内置那份数据 */
+
+    /** 替网页去问上游。必须在这里发 —— 上游只认 Origin: h5.mygolbs.com，
+     *  而这个头在浏览器里是禁止修改的，只有原生能设。 */
+    private byte[] fetchUpstream(String query) {
+        HttpURLConnection c = null;
+        try {
+            String url = UPSTREAM + "?" + (query == null ? "" : query);
+            c = (HttpURLConnection) new URL(url).openConnection();
+            c.setRequestMethod("GET");
+            c.setConnectTimeout(8000);
+            c.setReadTimeout(12000);
+            c.setRequestProperty("Origin", "https://h5.mygolbs.com");
+            c.setRequestProperty("User-Agent",
+                    "Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 "
+                    + "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
+            if (c.getResponseCode() != 200) {
+                return ("{\"status\":\"-1\",\"msg\":\"http" + c.getResponseCode() + "\"}")
+                        .getBytes("UTF-8");
+            }
+            InputStream in = c.getInputStream();
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            in.close();
+            return out.toByteArray();
+        } catch (Exception e) {
+            return "{\"status\":\"-1\",\"msg\":\"net\"}".getBytes();
+        } finally {
+            if (c != null) c.disconnect();
+        }
+    }
+
+    /** 从 assets/web 里读页面文件。 */
+    private WebResourceResponse serveAsset(String path) {
+        String rel = (path == null || path.length() <= 1) ? "index.html" : path.substring(1);
+        String mime = "application/octet-stream";
+        if (rel.endsWith(".html")) mime = "text/html";
+        else if (rel.endsWith(".js")) mime = "application/javascript";
+        else if (rel.endsWith(".css")) mime = "text/css";
+        else if (rel.endsWith(".json")) mime = "application/json";
+        else if (rel.endsWith(".png")) mime = "image/png";
+        else if (rel.endsWith(".svg")) mime = "image/svg+xml";
+        try {
+            InputStream in = getAssets().open("web/" + rel);
+            WebResourceResponse r = new WebResourceResponse(mime, "utf-8", in);
+            Map<String, String> h = new HashMap<String, String>();
+            h.put("Cache-Control", "no-cache");
+            r.setResponseHeaders(h);
+            return r;
+        } catch (Exception e) {
+            return new WebResourceResponse("text/plain", "utf-8",
+                    new ByteArrayInputStream("not found".getBytes()));
+        }
+    }
+
     /** 连不上电脑上的服务时，给一个能看懂、能自己救回来的页面。 */
     private void showOffline() {
         root.removeAllViews();
         LinearLayout box = page();
         box.addView(title("连不上"));
-        box.addView(para("手机和电脑要在同一个 WiFi 下，电脑上要先双击运行「启动.bat」，黑窗口不要关。"));
+        box.addView(para("手机和电脑要在同一个 WiFi 下，电脑上要先双击运行「启动.bat」，黑窗口不要关。"
+                       + "不想连电脑，点最下面那个按钮就行。"));
         box.addView(para("当前地址：" + prefs.server()));
         box.addView(bigButton("重试", new View.OnClickListener() {
             @Override public void onClick(View v) { openWeb(); }
@@ -141,8 +257,10 @@ public class MainActivity extends Activity {
     private void showSetup() {
         root.removeAllViews();
         LinearLayout box = page();
-        box.addView(title("公交到站"));
-        box.addView(para("在电脑上运行「启动.bat」，把黑窗口里显示的地址填到下面。像这样："));
+        box.addView(title("连电脑（可选）"));
+        box.addView(para("不用填也能用 —— App 自己带数据，出门在外照样查。"
+                       + "填了就走家里电脑上的服务，局域网里反应更快、也更省流量。"));
+        box.addView(para("要用的话，先在电脑上运行「启动.bat」，把黑窗口里的地址填到下面："));
         box.addView(paraStrong("http://192.168.1.5:8765"));
 
         final EditText et = new EditText(this);
@@ -165,7 +283,14 @@ public class MainActivity extends Activity {
             }
         }), gap(18));
 
-        box.addView(paraSmall("地址只要填一次，以后开机就直接进查询页。"));
+        box.addView(bigButton("还是用手机自己的数据", new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                prefs.server("");
+                openWeb();
+            }
+        }), gap(10));
+
+        box.addView(paraSmall("地址只要填一次。想改回来，点上面这个按钮。"));
         root.addView(scroll(box));
     }
 
