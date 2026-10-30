@@ -2,9 +2,9 @@
   "file": "bus-arrival-1.0.0.apk",
   "version": "1.0.0",
   "versionCode": 1,
-  "size": 25131,
-  "sha256": "cc49d0c78558cf2c2c00ad37e3bbeeabe272e2c612bce99673995171f87df423",
+  "size": 29227,
+  "sha256": "1e693cb58f5b1ec7a379d4f38043967c31c4fe69b0d46bde5e685ce075a4127f",
   "cert": "ed1ffbdf37800405bad522e2296c720404967e6a5cb253774cdeb30d0c0c9102",
   "signed": "v1+v2",
-  "built": "2026-10-30 11:09"
+  "built": "2026-10-30 11:35"
 }

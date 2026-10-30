@@ -729,6 +729,36 @@ V2_OVERRIDE = r"""
 .row:active,.row.down{background:#F1F1EA}
 .swall:active,.swall.down{opacity:.55}
 
+/* ---- 附近站点：定位状态 + 范围三档 + 站点列表 ---- */
+.nearhead{display:flex;align-items:baseline;justify-content:space-between;
+          padding:14px 16px 0}
+.nh{font-size:15.5px;font-weight:700;color:#1A1C1E}
+.nstate{font-size:12.5px;color:#8A8F94}
+.ranges{display:flex;gap:8px;padding:10px 16px 4px;flex-wrap:wrap}
+.rg{
+  flex:0 0 auto;padding:9px 15px;border-radius:12px;border:1px solid #E4E3DA;
+  background:#fff;font-size:14px;color:#5C6166;font-family:inherit;cursor:pointer;
+  transition:background .12s ease, color .12s ease, border-color .12s ease, transform .12s ease;
+  min-height:38px;
+}
+.rg.sel{background:#0B2743;color:#fff;border-color:#0B2743;font-weight:600}
+.rg:active,.rg.down{transform:scale(.95)}
+/* 站名要黑 —— .row .dst 原本是给「往 某某」用的灰字，套到站点上老人看着费劲 */
+.nitm .dst{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+           color:#1A1C1E;font-size:16px}
+.nitm .nd{font-size:13.5px;color:#8A8F94;flex-shrink:0;font-variant-numeric:tabular-nums}
+/* 选中不只是换底色：左边一条竖线 + 站名加深，扫一眼就知道「现在看的是这站」 */
+.nitm.sel{background:#E7EDF6;box-shadow:inset 3px 0 0 #0B2743}
+.nitm.sel .dst{color:#0B2743;font-weight:700}
+.nitm.sel .nd{color:#4A6B8F}
+.nearnone{padding:12px 16px 6px;font-size:14px;color:#8A8F94;line-height:1.65}
+/* 「这站有哪些车」的分段标题：要比 .sec 那层灰字重，
+   否则整页会糊成一张长列表，老人分不清哪是站、哪是车 */
+.curhead{
+  margin:8px 16px 0;padding:18px 0 8px;border-top:1px solid #EFEEE8;
+  font-size:16px;font-weight:700;color:#1A1C1E;letter-spacing:-.2px;
+}
+
 /* ---- 选线与列表：点得准，也看得出点中了 ----
    原来只有 :active 换个底色，桌面上鼠标移过去毫无反应，手机上按下去
    也只是一闪。这里补三件事：桌面悬停、按下位移、点击后先确认再跳。 ---- */

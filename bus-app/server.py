@@ -9,9 +9,11 @@
 
 import json
 import math
+import os
 import re
 import socket
 import struct
+import threading
 import time
 import urllib.parse
 import urllib.request
@@ -289,6 +291,13 @@ def fetch_stops(line, d):
         "to": stops[-1]["name"] if stops else "",
         "stops": stops,
     }
+    # 站表自带坐标，顺手攒进站库 —— 附近站点功能的数据就是从这儿来的
+    changed = False
+    for s in stops:
+        if station_db_put(s["name"], s["lat"], s["lon"]):
+            changed = True
+    if changed:
+        station_db_flush()
     _stops_cache[ck] = (time.time(), detail)
     return detail
 
@@ -327,6 +336,101 @@ def fetch_platforms(station):
         except (TypeError, ValueError):
             continue
     return out
+
+
+# ---------------------------------------------------------------- 站库
+# 上游没有「给坐标反查站点」的接口（CMD 209 只能按站名查，dis 恒为 -1），
+# 所以「附近有哪些站」必须自己算。好在 CMD 103 的站表里直接带 station_lat/lon，
+# 一条线一次请求就能拿到全线站名和坐标 —— 看过哪条线，那条线的站就进库。
+STATION_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stations.json")
+_st_db = None
+_st_dirty = False
+
+
+def station_db():
+    global _st_db
+    if _st_db is None:
+        try:
+            with open(STATION_DB, encoding="utf-8") as f:
+                _st_db = json.load(f)
+        except Exception:
+            _st_db = {}
+    return _st_db
+
+
+def station_db_put(name, lat, lon):
+    """记一个站的坐标。返回 True 表示库里有变化（需要写盘）。"""
+    global _st_dirty
+    try:
+        lat, lon = float(lat), float(lon)
+    except (TypeError, ValueError):
+        return False
+    if not name or not lat or not lon:
+        return False
+    db = station_db()
+    pts = db.setdefault(name, [])
+    p = [round(lat, 6), round(lon, 6)]
+    # 同名站常有两个站台，坐标差十几米。都留着，算距离时取近的那个。
+    for q in pts:
+        if abs(q[0] - p[0]) < 1e-5 and abs(q[1] - p[1]) < 1e-5:
+            return False
+    pts.append(p)
+    _st_dirty = True
+    return True
+
+
+def station_db_flush():
+    """攒一批再写盘 —— 一张站表能带来 40 个站，逐个写太浪费。"""
+    global _st_dirty
+    if not _st_dirty:
+        return
+    try:
+        tmp = STATION_DB + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(station_db(), f, ensure_ascii=False)
+        os.replace(tmp, STATION_DB)
+        _st_dirty = False
+    except Exception:
+        pass
+
+
+def _dist_m(lat1, lon1, lat2, lon2):
+    """两点直线距离（米）。筛附近站点用这个就够，不需要路网距离。"""
+    R = 6371000.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = p2 - p1
+    dl = math.radians(lon2 - lon1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * R * math.asin(min(1.0, math.sqrt(a)))
+
+
+def build_nearby(lat, lon, radius=500, limit=15):
+    db = station_db()
+    hits = []
+    for name, pts in db.items():
+        if not pts:
+            continue
+        d = min(_dist_m(lat, lon, p[0], p[1]) for p in pts)
+        if d <= radius:
+            hits.append({"name": name, "dist": int(round(d))})
+    hits.sort(key=lambda x: (x["dist"], x["name"]))
+    return {"ok": True, "stations": hits[:limit], "total": len(hits),
+            "radius": radius, "known": len(db)}
+
+
+def warm_nearby_db():
+    """第一次跑时，把默认线路两个方向的站表各取一次，站点坐标自动进库。
+    40 个站、两次请求，之后启动不会再发 —— 这是「附近站点」的数据底座。"""
+    try:
+        if len(station_db()) >= 10:
+            return
+        for d in ("1", "2"):
+            try:
+                fetch_stops(HOME_LINE, d)
+            except Exception:
+                pass
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------- 业务层
@@ -419,13 +523,13 @@ def window_stops(detail, main=None):
             "pace": None if pace is None else round(pace, 1)}
 
 
-def build_home():
+def build_home(station=None):
     """首页 = 附近站牌 + 搜索入口。
 
-    「附近」现在还是写死的 HOME_STATION，等手机定位接上以后改成按距离选站，
-    到时候换掉这一个参数就行，前端不用动。
+    station 由前端按定位结果传进来（附近列表里选中的那个站）；
+    没传就退回 HOME_STATION —— 定位失败也得能用。
     """
-    data = build_station(HOME_STATION)
+    data = build_station((station or "").strip() or HOME_STATION)
     data["isHome"] = True
     return data
 
@@ -1166,38 +1270,213 @@ function stationRows(lines, station, limit){
 
 /* 首页 = 附近站牌 + 搜索。这里只负责选「哪条线哪个方向」，
    具体的到站大卡片在 #/b/线路/方向 那一页。 */
+/* ---- 附近站点：定位 → 筛范围 → 自己选站 -------------------------------
+   位置只有两个来源，都是真来源，拿不到就说拿不到：
+   ① App 里的原生桥（优先）—— WebView 加载的是 http:// 局域网地址，浏览器
+      会因为「不是安全来源」直接拒绝 navigator.geolocation；
+   ② 浏览器 geolocation（https 或 localhost 才给）。
+   两个都失败就退回上次用的站，绝不编一个坐标出来。 */
+var _near = { lat: null, lon: null, r: 800, list: [], cur: "" };
+
+function nearR(){
+  var v = parseInt(ls("nearR") || "800", 10);
+  return (v === 300 || v === 2000) ? v : 800;
+}
+
+function locate(cb, retried){
+  var done = false;
+  function fin(v){ if(!done){ done = true; cb(v); } }
+
+  if(window.__forceLoc){ fin(window.__forceLoc); return; }
+
+  // ① 原生桥
+  try{
+    var B = window.AndroidBridge;
+    if(B && B.getLocation){
+      var raw = B.getLocation();          // "lat,lng"；拿不到回空串
+      if(raw && raw.indexOf(",") > 0){
+        var a = raw.split(",");
+        var la = parseFloat(a[0]), lo = parseFloat(a[1]);
+        if(isFinite(la) && isFinite(lo) && la !== 0){ fin({lat:la, lon:lo, src:"app"}); return; }
+      }
+      // 在 App 里却拿不到坐标：多半是系统权限框刚弹出来，用户还在点。
+      // 等两秒再问一次，别急着说「定位不到」。
+      if(!retried){
+        setTimeout(function(){ locate(cb, true); }, 2500);
+        return;
+      }
+    }
+  }catch(e){}
+
+  // ② 浏览器
+  if(!navigator.geolocation){ fin(null); return; }
+
+  function ask(){
+    try{
+      navigator.geolocation.getCurrentPosition(
+        function(p){ fin({lat:p.coords.latitude, lon:p.coords.longitude, src:"web"}); },
+        function(){ fin(null); },
+        {enableHighAccuracy:true, timeout:6000, maximumAge:120000}
+      );
+    }catch(e){ fin(null); return; }
+    // 有的浏览器既不回成功也不回失败，自己兜一个超时，别让页面一直卡在「正在定位」
+    setTimeout(function(){ fin(null); }, 5000);
+  }
+
+  // 已经明确被拒绝的（http 非安全来源、用户点过不允许），别再等
+  if(navigator.permissions && navigator.permissions.query){
+    navigator.permissions.query({name:"geolocation"}).then(function(st){
+      if(st && st.state === "denied"){ fin(null); } else { ask(); }
+    }).catch(ask);
+  } else {
+    ask();
+  }
+}
+
+function rangeBtns(){
+  var rs = [300, 800, 2000], h = "";
+  for(var i = 0; i < rs.length; i++){
+    var t = rs[i] < 1000 ? (rs[i] + " 米") : (rs[i] / 1000 + " 公里");
+    h += '<button class="rg' + (rs[i] === _near.r ? " sel" : "") + '" data-r="' + rs[i]
+       + '" onclick="setRange(' + rs[i] + ')">' + t + '</button>';
+  }
+  return h;
+}
+
+function setRange(r){
+  _near.r = r;
+  ls("nearR", String(r));
+  var bs = document.querySelectorAll(".rg");
+  for(var i = 0; i < bs.length; i++){
+    bs[i].className = "rg" + (parseInt(bs[i].getAttribute("data-r"), 10) === r ? " sel" : "");
+  }
+  if(_near.lat !== null) fetchNearby();
+}
+
+function fmtDist(m){
+  return m < 1000 ? (m + " 米") : ((m / 1000).toFixed(1) + " 公里");
+}
+
+function markNear(){
+  var box = document.getElementById("nlist");
+  if(!box) return;
+  var its = box.querySelectorAll(".nitm");
+  for(var i = 0; i < its.length; i++){
+    var on = its[i].getAttribute("data-st") === _near.cur;
+    its[i].className = "row nitm" + (on ? " sel" : "");
+  }
+}
+
+function renderNear(msg){
+  var box = document.getElementById("nlist");
+  if(!box) return;
+  if(!_near.list.length){
+    box.innerHTML = '<div class="nearnone">' + esc(msg || "这个范围里没有站，把范围放大一点") + '</div>';
+    return;
+  }
+  var h = "";
+  for(var i = 0; i < _near.list.length; i++){
+    var s = _near.list[i];
+    h += '<div class="row nitm' + (s.name === _near.cur ? " sel" : "") + '" '
+       + 'data-st="' + esc(s.name) + '" '
+       + 'onclick="pickStation(this.getAttribute(\'data-st\'))">'
+       + '<span class="dst">' + esc(s.name) + '</span>'
+       + '<span class="nd">' + fmtDist(s.dist) + '</span>'
+       + '<span class="arrow">›</span></div>';
+  }
+  box.innerHTML = h;
+}
+
+function fetchNearby(){
+  var box = document.getElementById("nlist");
+  if(box) box.innerHTML = '<div class="loading" style="padding:16px">正在找附近的站…</div>';
+  api("/api/nearby?lat=" + _near.lat + "&lon=" + _near.lon + "&r=" + _near.r)
+  .then(function(p){
+    if(!p.ok){ renderNear("查不到附近站点"); return; }
+    _near.list = p.stations || [];
+    renderNear("");
+    // 第一次来就选最近的那个；已经选过站就别动她的选择
+    if(!_near.cur && _near.list.length) pickStation(_near.list[0].name);
+    else markNear();
+  })
+  .catch(function(){ renderNear("连不上，附近站点查不了"); });
+}
+
+/* 选中一个站：高亮它，再把下半部分换成这站的线路 */
+function pickStation(name){
+  if(!name) return;
+  _near.cur = name;
+  ls("homeStation", name);
+  markNear();
+  loadStation(name);
+}
+
+/* 拉某个站有哪些车。name 为空时后端退回默认站 */
+function loadStation(name){
+  var el = document.getElementById("lst");
+  if(!el) return;
+  el.innerHTML = '<div class="loading" style="padding:16px">正在查这站有哪些车…</div>';
+  api("/api/home?station=" + encodeURIComponent(name || ""))
+  .then(function(p){
+    if(!p.ok){ el.innerHTML = errBox("查不到", p.error); return; }
+    var sec = document.getElementById("cursec");
+    if(sec) sec.textContent = p.station + "站 · 有车的在前";
+    var ck = document.getElementById("clock");
+    if(ck) ck.innerHTML = '<i class="live"></i>' + p.updated;
+
+    if(!_near.cur){ _near.cur = p.station; markNear(); }
+
+    var lines = p.lines || [];
+    if(!lines.length){
+      el.innerHTML = '<div class="tip" style="padding:12px 0 20px">这站没有线路</div>';
+      return;
+    }
+    el.innerHTML = stationRows(lines, p.station)
+      + (lines.length > 6
+         ? '<div class="more" onclick="showMore()">还有 ' + (lines.length - 6) + ' 条线，点这里看 ›</div>'
+         : '');
+  })
+  .catch(function(){ el.innerHTML = errBox("连不上", "检查电脑上的程序是否还在运行"); });
+}
+
 function viewHome(){
   var el = document.getElementById("app");
-  el.innerHTML = '<div class="loading">正在查这站有哪些车…</div>';
-  api("/api/home").then(function(p){
-    if(!p.ok){ el.innerHTML = errBox("查不到", p.error); return; }
-    var lines = p.lines || [];
-    if(!lines.length){ el.innerHTML = errBox("这个站没有线路", "换个站试试"); return; }
+  _near.r = nearR();
+  _near.cur = ls("homeStation") || "";
+  _near.list = [];
 
-    var html = '<div class="nav"><span class="t">'+esc(p.station)+'站</span>'
-             + '<button class="setlink" onclick="openSheet()">设置</button>'
-             + '<span class="r" id="clock"><i class="live"></i>'+p.updated+'</span></div>';
+  el.innerHTML = '<div class="nav"><span class="t">附近站牌</span>'
+    + '<button class="setlink" onclick="openSheet()">设置</button>'
+    + '<span class="r" id="clock"><i class="live"></i>--:--</span></div>'
+    + '<div class="sbar">'
+    + '<input id="hkw" class="sinput" type="search" inputmode="search" '
+    + 'placeholder="搜线路号或站名" '
+    + 'onkeydown="if(event.key===\'Enter\'){event.preventDefault();homeSearch();}">'
+    + '<button class="sbtn" onclick="homeSearch()">搜</button></div>'
+    + '<div class="scroll flush">'
+    + '<div class="nearhead"><span class="nh">附近的站</span>'
+    + '<span class="nstate" id="locstate">正在定位…</span></div>'
+    + '<div class="ranges">' + rangeBtns() + '</div>'
+    + '<div id="nlist"><div class="loading" style="padding:16px">正在定位…</div></div>'
+    + '<div class="curhead" id="cursec">这站有哪些车</div>'
+    + '<div id="lst"></div>'
+    + '</div>';
 
-    html += '<div class="sbar">'
-          + '<input id="hkw" class="sinput" type="search" inputmode="search" '
-          + 'placeholder="搜线路号或站名" '
-          + 'onkeydown="if(event.key===\'Enter\'){event.preventDefault();homeSearch();}">'
-          + '<button class="sbtn" onclick="homeSearch()">搜</button></div>';
+  // 先把「这站有哪些车」显示出来 —— 定位可能要等几秒，不能让她对着空页面等
+  loadStation(_near.cur);
 
-    html += '<div class="scroll flush">';
-    html += '<div class="sec" style="padding:12px 16px 6px">附近站牌 · 有车的在前</div>';
-    html += '<div id="lst">' + stationRows(lines, p.station) + '</div>';
-    if(lines.length > 6){
-      html += '<div class="more" id="more" onclick="showMore()">还有 '
-            + (lines.length - 6) + ' 条线，点这里看 ›</div>';
+  locate(function(pos){
+    var st = document.getElementById("locstate");
+    if(!pos){
+      if(st) st.textContent = "拿不到位置";
+      renderNear("拿不到位置。下面是上次看的站；想换站，用上面的搜索框搜站名");
+      return;
     }
-    if(lines.length <= 3){
-      html += '<div class="tip" style="padding:26px 16px 10px">这站就这几趟车。'
-            + '想查别的线路，用上面的搜索框</div>';
-    }
-    html += '</div>';
-    el.innerHTML = html;
-  }).catch(function(){ el.innerHTML = errBox("连不上", "检查电脑上的程序是否还在运行"); });
+    _near.lat = pos.lat;
+    _near.lon = pos.lon;
+    if(st) st.textContent = "已定位";
+    fetchNearby();
+  });
 }
 
 function homeSearch(){
@@ -1943,6 +2222,16 @@ document.addEventListener("pointerdown", function(){
   }
 }, {passive:true});
 
+/* 临时调试：?loc=27.96,120.74 直接给坐标，验证「已定位」那条路径。
+   WebView 和局域网 http 都拿不到真的定位，只能这样测。测完删。 */
+if(location.search.indexOf("loc=") >= 0){
+  (function(){
+    var m = location.search.match(/loc=([-0-9.]+),([-0-9.]+)/);
+    if(!m) return;
+    window.__forceLoc = {lat: parseFloat(m[1]), lon: parseFloat(m[2])};
+  })();
+}
+
 window.addEventListener("hashchange", route);
 route();
 
@@ -1967,7 +2256,8 @@ route();
     while(t && t !== document.body){
       var c = t.classList;
       if(c && (c.contains("btn") || c.contains("opt") || c.contains("th")
-            || c.contains("row") || c.contains("dircard") || c.contains("swall"))){
+            || c.contains("row") || c.contains("dircard") || c.contains("swall")
+            || c.contains("rg"))){
         clear(); cur = t; t.classList.add("down"); mark(t); break;
       }
       t = t.parentNode;
@@ -2164,7 +2454,8 @@ class Handler(BaseHTTPRequestHandler):
                            extra={"Vary": "Cookie"})
 
             elif path == "/api/home":
-                self._json(build_home())
+                st = (q.get("station") or [""])[0].strip()
+                self._json(build_home(st))
 
             elif path == "/api/eta":
                 # 点站点看车多久到：问的是「这一站」的实时到站
@@ -2184,6 +2475,21 @@ class Handler(BaseHTTPRequestHandler):
                     self._json({"ok": False, "error": "缺少线路名"})
                 else:
                     self._json(build_board(line, d, station))
+
+            elif path == "/api/nearby":
+                # 附近站点：前端把定位坐标传上来，本地站库算距离再筛。
+                # 拿不到定位就不编一个坐标 —— 宁可回错，让页面说「定位不了」。
+                try:
+                    lat = float((q.get("lat") or [""])[0])
+                    lon = float((q.get("lon") or [""])[0])
+                except ValueError:
+                    self._json({"ok": False, "error": "没有位置"})
+                    return
+                try:
+                    rad = int((q.get("r") or ["500"])[0])
+                except ValueError:
+                    rad = 500
+                self._json(build_nearby(lat, lon, max(100, min(3000, rad))))
 
             elif path == "/api/station":
                 name = (q.get("name") or [""])[0].strip()
@@ -2330,6 +2636,9 @@ if __name__ == "__main__":
         print()
         input("按回车键退出…")
         raise SystemExit(1)
+
+    # 后台把默认线路的站坐标攒进库，别卡住启动
+    threading.Thread(target=warm_nearby_db, daemon=True).start()
 
     try:
         import webbrowser

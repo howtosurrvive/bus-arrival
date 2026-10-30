@@ -6,6 +6,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Build;
@@ -113,6 +116,8 @@ public class MainActivity extends Activity {
                    != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 7);
         }
+        // 附近站点要用位置。首次启动会弹一次系统权限框，拒绝也不影响手动选站。
+        askLocPerm();
     }
 
     /** 连不上电脑上的服务时，给一个能看懂、能自己救回来的页面。 */
@@ -252,6 +257,53 @@ public class MainActivity extends Activity {
         Toast.makeText(this, s, Toast.LENGTH_SHORT).show();
     }
 
+    /* ------------------------------------------------------------ 定位
+       网页加载的是 http://192.168.x.x:8765，浏览器认为这不是安全来源，
+       navigator.geolocation 直接拒绝。所以位置只能由 App 自己拿，
+       再通过桥给页面。页面那边拿不到就说拿不到，不编坐标。 */
+    private static volatile Location lastFix;
+
+    private boolean hasLocPerm() {
+        return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+                   == PackageManager.PERMISSION_GRANTED
+            || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+                   == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void askLocPerm() {
+        if (Build.VERSION.SDK_INT >= 23 && !hasLocPerm()) {
+            requestPermissions(new String[]{
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION}, 8);
+        }
+    }
+
+    /** 要一次当前位置。异步回，结果写 lastFix，网页下次问就有值。 */
+    private void requestOneFix() {
+        if (!hasLocPerm()) return;
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                try {
+                    LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+                    if (lm == null) return;
+                    String prov = null;
+                    if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                        prov = LocationManager.GPS_PROVIDER;
+                    } else if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                        prov = LocationManager.NETWORK_PROVIDER;
+                    }
+                    if (prov == null) return;
+                    lm.requestSingleUpdate(prov, new LocationListener() {
+                        @Override public void onLocationChanged(Location l) { lastFix = l; }
+                        @Override public void onStatusChanged(String p, int st, Bundle b) {}
+                        @Override public void onProviderEnabled(String p) {}
+                        @Override public void onProviderDisabled(String p) {}
+                    }, null);
+                } catch (Exception ignored) {}
+            }
+        });
+    }
+
     /* ------------------------------------------------------------ 给网页的桥 */
 
     public class Bridge {
@@ -278,6 +330,36 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public boolean nativeOn() {
             return true;
+        }
+
+        /** 给网页的坐标，形如 "27.964,120.747"；拿不到回空串。 */
+        @JavascriptInterface
+        public String getLocation() {
+            if (!hasLocPerm()) {
+                runOnUiThread(new Runnable() {
+                    @Override public void run() { askLocPerm(); }
+                });
+                return "";
+            }
+            long now = System.currentTimeMillis();
+            Location l = lastFix;
+            if (l == null) {
+                // 退一步用系统缓存的最近位置，但太旧的不要 —— 人可能已经走远了
+                try {
+                    LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+                    if (lm != null) {
+                        for (String p : lm.getProviders(true)) {
+                            Location c = lm.getLastKnownLocation(p);
+                            if (c != null && now - c.getTime() < 5 * 60 * 1000L) {
+                                if (l == null || c.getTime() > l.getTime()) l = c;
+                            }
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+            requestOneFix();          // 顺手更新，网页下一次问就是新的
+            if (l == null || now - l.getTime() > 10 * 60 * 1000L) return "";
+            return l.getLatitude() + "," + l.getLongitude();
         }
 
         @JavascriptInterface
