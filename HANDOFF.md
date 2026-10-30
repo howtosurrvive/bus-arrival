@@ -233,10 +233,27 @@ centerMyStop()  把「你在这」滚到屏幕合适的位置
 
 ### 6.2 `bus-app/skins.py`
 
-三套皮肤：`SKINS = {"a": CSS_A, "b": CSS_B, "c": CSS_A + V2_OVERRIDE}`
-线上默认用 `c`（白卡 + V2 优化层）；加 `?skin=a` 可以切回旧版对比。
+五套皮肤，都基于白卡的 CSS，只换颜色不改布局：
 
-白卡配色：底 `#FAFAF7`、卡片纯白、主字 `#1A1C1E`、线路蓝 `#0E3A63`、紧急橙 `#DA6B1C`、正常绿 `#1F9E5A`。
+| key | 是什么 | 怎么切 |
+| --- | --- | --- |
+| `a` | 早期白卡（无 V2 优化层） | `?skin=a` |
+| `b` | 深色版 | `?skin=b` |
+| `c` | **现有默认**：白卡 + V2 优化层，深蓝 | 默认 |
+| `d` | 暖橘（底色暖白、主色深橘棕） | `?skin=d` |
+| `e` | 晴空（底色冷白、主色亮蓝，橙红点缀） | `?skin=e` |
+
+`d` / `e` 由 `_tint(css, 映射表)` 一次性正则替换 hex 生成（`_THEME_WARM` / `_THEME_SKY`），
+**不复制 CSS、不改任何布局**。加一套新配色的成本就是再写一张颜色映射表。
+
+白卡（`c`）配色：底 `#FAFAF7`、卡片纯白、主字 `#1A1C1E`、线路蓝 `#0E3A63`、紧急橙 `#DA6B1C`、正常绿 `#1F9E5A`。
+
+**图标**：`server.py` 的 `_png_icon(size, variant)` 用标准库直接画 PNG，造型是圆润小巴
+（白色车身 + 两只圆窗 + 黄色车头灯带 + 两个轮子）。`variant` 取 `warm` / `sky` / `deep`，
+与皮肤一一对应（`c→deep`、`d→warm`、`e→sky`），页面的 favicon 与 `theme-color` 会跟着皮肤变。
+`build.sh` 打包时按第二个参数重画 App 图标，默认 `warm`。
+
+三套方案的对比与数据在根目录 `配色方案对比.html`。
 
 ### 6.3 `android/src/com/leina/bus/`
 

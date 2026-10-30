@@ -33,6 +33,20 @@ echo "==> 默认服务器地址: ${DEF_SERVER:-（留空，装好后手填）}"
 rm -rf "$OUT"
 mkdir -p "$OUT/gen" "$OUT/classes" "$OUT/dex" "$OUT/src"
 
+# 0. 图标：跟网页配色同源，形状一致，只换底色。
+#    第二个参数选 warm / sky / deep，默认暖橘。
+ICON_V="${2:-warm}"
+python - "$ICON_V" <<'PY'
+import sys
+sys.path.insert(0, "../bus-app")
+import server
+v = sys.argv[1]
+for sz, d in ((192, "res/mipmap-xxhdpi"), (96, "res/mipmap-hdpi")):
+    open(d + "/ic_launcher.png", "wb").write(server._png_icon(sz, v))
+open("../dist/icon-192.png", "wb").write(server._png_icon(192, v))
+print("==> 图标已更新（%s）" % v)
+PY
+
 # 1. 生成一份改了默认地址的 Prefs.java
 sed "s|@DEFAULT_SERVER@|$DEF_SERVER|" src/com/leina/bus/Prefs.java > "$OUT/src/Prefs.java"
 for f in src/com/leina/bus/*.java; do

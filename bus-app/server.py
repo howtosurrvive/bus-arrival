@@ -30,63 +30,105 @@ HOME_STATION = "石坦"
 HOME_LINE = "36路"
 PORT = 8765
 
-# 主屏图标：不依赖 Pillow，用标准库直接编一张 PNG。
-# 图案就是首页那条时间轴 —— 一条竖线串三个站点，和界面里看到的一致。
-ICON_BG = (14, 58, 99)       # #0E3A63
+# 主屏图标：不依赖 Pillow，用标准库直接编 PNG。
+# 造型是一辆正面小巴 —— 白色圆润车身、两只圆窗当眼睛、两个车轮，圆角底色。
+# 比原来那条竖线更像「车」、更软。三版只换底色和细节色，形状完全一致。
+ICON_BG = (14, 58, 99)       # 旧版底色，保留给老链接
 _icon_cache = {}
 
+ICON_THEMES = {
+    # 暖橘：最亲和，暖色不刺眼
+    "warm": {"top": (255, 199, 122), "bot": (255, 143, 77),
+             "body": (255, 255, 255), "glass": (63, 43, 31),
+             "wheel": (63, 43, 31), "lamp": (255, 209, 102)},
+    # 晴空：清亮，和蓝白卡一脉，但明度拉高
+    "sky":  {"top": (152, 215, 247), "bot": (77, 167, 232),
+             "body": (255, 255, 255), "glass": (17, 69, 106),
+             "wheel": (17, 69, 106), "lamp": (255, 209, 102)},
+    # 深蓝：原来的观感，作为对照保留
+    "deep": {"top": (24, 80, 128), "bot": (14, 58, 99),
+             "body": (255, 255, 255), "glass": (14, 58, 99),
+             "wheel": (14, 58, 99), "lamp": (255, 209, 102)},
+}
+ICON_DEFAULT = "warm"
 
-def _png_icon(size=192):
-    if size in _icon_cache:
-        return _icon_cache[size]
 
-    W = H = size
-    rad = size * 0.23
-    cx = size * 0.5                  # 竖线居中，三点对称，缩到 48px 也认得出
-    lw = size * 0.030
-    dots = [(cx, size * 0.255, size * 0.058),
-            (cx, size * 0.500, size * 0.058),
-            (cx, size * 0.745, size * 0.058)]
+def _rr(px, py, x0, y0, x1, y1, r):
+    """点是否落在圆角矩形里。"""
+    if px < x0 or px > x1 or py < y0 or py > y1:
+        return False
+    cx = min(max(px, x0 + r), x1 - r)
+    cy = min(max(py, y0 + r), y1 - r)
+    return (px - cx) ** 2 + (py - cy) ** 2 <= r * r
 
-    def inside(x, y):
-        if not (0 <= x < W and 0 <= y < H):
-            return False
-        if x < rad and y < rad:
-            return (x - rad) ** 2 + (y - rad) ** 2 <= rad * rad
-        if x >= W - rad and y < rad:
-            return (x - (W - rad)) ** 2 + (y - rad) ** 2 <= rad * rad
-        if x < rad and y >= H - rad:
-            return (x - rad) ** 2 + (y - (H - rad)) ** 2 <= rad * rad
-        if x >= W - rad and y >= H - rad:
-            return (x - (W - rad)) ** 2 + (y - (H - rad)) ** 2 <= rad * rad
-        return True
+
+def _ci(px, py, cx, cy, r):
+    return (px - cx) ** 2 + (py - cy) ** 2 <= r * r
+
+
+def _png_icon(size=192, variant=None):
+    variant = variant or ICON_DEFAULT
+    key = (size, variant)
+    if key in _icon_cache:
+        return _icon_cache[key]
+
+    t = ICON_THEMES.get(variant) or ICON_THEMES[ICON_DEFAULT]
+    S = float(size)
+    bx0, by0, bx1, by1 = S * .190, S * .265, S * .810, S * .700      # 车身
+    br = S * .145
+    wins = [(S * .248, S * .333, S * .466, S * .503),                 # 两只窗，圆角大一点更像「眼睛」
+            (S * .534, S * .333, S * .752, S * .503)]
+    wr = S * .058
+    wheels = [(S * .312, S * .728, S * .090),
+              (S * .688, S * .728, S * .090)]
+    # 一条前脸横杠，代替两颗车灯 —— 小尺寸下更干净，也不像鼻孔
+    bar = (S * .330, S * .548, S * .670, S * .586, S * .019)
+
+    def shade(px, py):
+        """这一点的颜色；圆角外返回 None。"""
+        if not _rr(px, py, 0, 0, S, S, S * .235):
+            return None
+        for cx, cy, cr in wheels:
+            if _ci(px, py, cx, cy, cr):
+                return t["wheel"]
+        if _rr(px, py, bx0, by0, bx1, by1, br):
+            for x0, y0, x1, y1 in wins:
+                if _rr(px, py, x0, y0, x1, y1, wr):
+                    return t["glass"]
+            if _rr(px, py, *bar[:4], bar[4]):
+                return t["lamp"]
+            return t["body"]
+        k = py / S
+        return tuple(int(t["top"][i] + (t["bot"][i] - t["top"][i]) * k) for i in range(3))
 
     raw = bytearray()
-    for y in range(H):
-        raw.append(0)                      # 每行的过滤器字节
-        py = y + 0.5
-        for x in range(W):
-            px = x + 0.5
-            if not inside(px, py):
+    for y in range(size):
+        raw.append(0)                       # 每行的过滤器字节
+        for x in range(size):
+            hits = []
+            for sy in (0.25, 0.75):          # 2×2 超采样，边缘不出锯齿
+                for sx in (0.25, 0.75):
+                    c = shade(x + sx, y + sy)
+                    if c:
+                        hits.append(c)
+            if not hits:
                 raw += b"\x00\x00\x00\x00"
                 continue
-            white = abs(px - cx) <= lw / 2 and size * 0.255 <= py <= size * 0.745
-            if not white:
-                for dx, dy, dr in dots:
-                    if (px - dx) ** 2 + (py - dy) ** 2 <= dr * dr:
-                        white = True
-                        break
-            raw += b"\xff\xff\xff\xff" if white else bytes(ICON_BG) + b"\xff"
+            n = len(hits)
+            raw += bytes((sum(c[0] for c in hits) // n,
+                          sum(c[1] for c in hits) // n,
+                          sum(c[2] for c in hits) // n,
+                          int(255 * n / 4)))
 
     def chunk(tag, data):
         c = struct.pack(">I", len(data)) + tag + data
         return c + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
 
     png = (b"\x89PNG\r\n\x1a\n"
-           + chunk(b"IHDR", struct.pack(">IIBBBBB", W, H, 8, 6, 0, 0, 0))
+           + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 6, 0, 0, 0))
            + chunk(b"IDAT", zlib.compress(bytes(raw), 9))
            + chunk(b"IEND", b""))
-    _icon_cache[size] = png
+    _icon_cache[key] = png
     return png
 
 CACHE_RT = 12        # 实时数据缓存秒数
@@ -1807,12 +1849,14 @@ def page_html(skin="a", pwa=False):
     pwa=True 时才挂 manifest 和主屏图标 —— 离线单文件（file://）挂这些只会报错。
     """
     css = SKINS.get(skin) or SKINS.get("a") or CSS
-    theme = "#E9EAE4" if skin == "b" else "#FAFAF7"
+    # 图标与状态栏底色跟着皮肤走，别让暖橘页面顶着深蓝图标
+    theme = {"b": "#E9EAE4", "d": "#FFF8F1", "e": "#F6FAFF"}.get(skin, "#FAFAF7")
+    icon_v = {"c": "deep", "d": "warm", "e": "sky"}.get(skin, "warm")
     head = ""
     if pwa:
         head = ("<link rel=\"manifest\" href=\"/manifest.json\">"
-                "<link rel=\"icon\" href=\"/icon.png?size=192\">"
-                "<link rel=\"apple-touch-icon\" href=\"/icon.png?size=180\">"
+                "<link rel=\"icon\" href=\"/icon.png?size=192&v=" + icon_v + "\">"
+                "<link rel=\"apple-touch-icon\" href=\"/icon.png?size=180&v=" + icon_v + "\">"
                 "<meta name=\"mobile-web-app-capable\" content=\"yes\">"
                 "<meta name=\"apple-mobile-web-app-capable\" content=\"yes\">"
                 "<meta name=\"apple-mobile-web-app-status-bar-style\" content=\"default\">"
@@ -1929,7 +1973,8 @@ class Handler(BaseHTTPRequestHandler):
                 except ValueError:
                     size = 192
                 size = max(48, min(512, size))
-                self._send_bytes(200, _png_icon(size), "image/png",
+                variant = (q.get("v") or [ICON_DEFAULT])[0].lower()
+                self._send_bytes(200, _png_icon(size, variant), "image/png",
                                  extra={"Cache-Control": "public, max-age=86400"})
 
             elif path == "/manifest.json":
