@@ -59,6 +59,8 @@ body{
   font-size:14px;color:#5C6166;flex:1;min-width:0;
   white-space:normal;overflow-wrap:break-word;line-height:1.3;
 }
+/* 和列表里的「往 某某」同一套层级：引导词小、目的地重 */
+.toward b{font-size:16.5px;font-weight:600;color:#1A1C1E;letter-spacing:-.2px}
 .swapbtn{
   margin-left:auto;flex-shrink:0;display:inline-flex;align-items:center;gap:5px;
   border:1px solid #DFE3E8;background:#fff;color:#3A4048;
@@ -390,6 +392,7 @@ body{
   font-size:14.5px;color:rgba(255,255,255,.74);flex:1;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
+.toward b{font-size:16.5px;font-weight:600;color:#fff;letter-spacing:-.2px}
 .swapbtn{
   margin-left:auto;flex-shrink:0;display:inline-flex;align-items:center;gap:6px;
   border:1px solid rgba(255,255,255,.26);background:rgba(255,255,255,.14);color:#fff;
@@ -682,7 +685,11 @@ V2_OVERRIDE = r"""
   padding:17px 2px;
 }
 .row .ln{min-width:0;font-size:20px;letter-spacing:-.3px}
-.row .dst{min-width:0;font-size:15px;color:#6B7165}
+/* 「往 某某」：老人判断「这车去不去我要的地方」，全靠这一行。
+   原来 15px 灰字排在线路号和时间后面，是整行里最弱的一层。
+   现在把引导词「往」压小，目的地加大加深 —— 视线先落在站名上。 */
+.row .dst{min-width:0;font-size:14.5px;color:#5C6166}
+.row .dst b{font-size:16.5px;font-weight:600;color:#1A1C1E;letter-spacing:-.2px}
 .row .tm{min-width:54px;font-size:25px}
 .row .arrow{display:none}
 .srow{grid-template-columns:minmax(0,auto) minmax(0,1fr) auto}
@@ -702,8 +709,10 @@ V2_OVERRIDE = r"""
 
 /* ---- 详情页：顶部信息与列表分开 ---- */
 .lhead{padding:2px 20px 15px;border-bottom:1px solid #EFEEE7}
-.lh2{font-size:19px;font-weight:500;color:#4A4F45}
-.lh2 b{font-size:21px;font-weight:700;color:#0E3A63}
+/* 详情页标题也是「往 某某」：和列表、卡片用同一套层级 ——
+   引导词压小，目的地才是这一行的主角 */
+.lh2{font-size:15px;font-weight:500;color:#7A7F74}
+.lh2 b{font-size:22px;font-weight:700;color:#0E3A63;letter-spacing:-.3px}
 .lh3{font-size:12.5px;color:#7A7F74}
 .swap{border-color:#D5DAE1;box-shadow:0 1px 2px rgba(22,32,43,.06)}
 
@@ -776,6 +785,8 @@ V2_OVERRIDE = r"""
 .nitm.sel .dst{color:#0B2743;font-weight:700}
 .nitm.sel .nd{color:#4A6B8F}
 .nearnone{padding:12px 16px 6px;font-size:14px;color:#8A8F94;line-height:1.65}
+/* 列表被截掉时的那句实话，只在真截断时出现 */
+.nearmore{padding:14px 16px 12px;font-size:13.5px;color:#7A7F74;line-height:1.7}
 
 /* ---- 附近站点区的收起 / 展开 ----
    2 公里一档几十个站，全摊着的话滑到「这站有哪些车」要拨好几屏。
@@ -871,6 +882,7 @@ V2_OVERRIDE = r"""
 /* ---- 响应式：窄屏收一档，别把方向名截断成「浙南科…」 ---- */
 @media (max-width:374px){
   .toward{font-size:13.5px}
+  .toward b{font-size:15px}
   .swapbtn{font-size:11.5px;padding:8px 10px;gap:4px}
   .swapbtn b{font-size:13.5px}
 }

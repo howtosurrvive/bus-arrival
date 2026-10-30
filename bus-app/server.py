@@ -1362,7 +1362,7 @@ function stationRows(lines, station, limit){
        + (hidden ? 'style="display:none"' : '') + ' data-late="' + (hidden ? 1 : 0) + '" '
        + 'onclick="go(\'' + href + '\')">'
        + '<span class="ln">' + esc(v.line) + '</span>'
-       + '<span class="dst">往 ' + esc(v.toShort) + '</span>'
+       + '<span class="dst">往 <b>' + esc(v.toShort) + '</b></span>'
        + '<span class="tm ' + tcls + '">' + tm + '</span>'
        + '<span class="arrow">›</span></div>';
   }
@@ -1378,7 +1378,7 @@ function stationRows(lines, station, limit){
    ② 浏览器 geolocation（https 或 localhost 才给）。
    两个都失败就退回上次用的站，绝不编一个坐标出来。 */
 var _near = { lat: null, lon: null, r: 800, list: [], cur: "",
-              fold: false, lstName: "", picked: false };
+              fold: false, lstName: "", picked: false, total: 0 };
 
 function nearR(){
   var v = parseInt(ls("nearR") || "800", 10);
@@ -1547,6 +1547,12 @@ function renderNear(msg){
        + (star ? "★" : "☆") + '</button>'
        + '</div>';
   }
+  // 被截掉了就说出来 —— 「2 公里内只有 30 个站」是假话，
+  // 真实有七八十个，老人找不到自己要的那站会以为它不存在
+  if(_near.total && _near.total > rows.length){
+    h += '<div class="nearmore">这个范围里共 ' + _near.total + ' 个站，'
+       + '先列最近的 ' + rows.length + ' 个。把范围缩小一点能看全。</div>';
+  }
   box.innerHTML = h;
   paintNearSlim();
 }
@@ -1559,6 +1565,7 @@ function fetchNearby(){
   .then(function(p){
     if(!p.ok){ renderNear("查不到附近站点"); return; }
     _near.list = p.stations || [];
+    _near.total = p.total || _near.list.length;
     renderNear("");
     // 第一次来就选最近的那个；已经选过站就别动她的选择
     if(!_near.picked && _near.list.length) pickStation(_near.list[0].name, false);
@@ -1673,6 +1680,7 @@ function viewHome(){
   _near.cur = ls("homeStation") || "";
   _near.picked = !!_near.cur;      // 用户自己选过的站才算，后端兜底的默认站不算
   _near.list = [];
+  _near.total = 0;
 
   el.innerHTML = '<div class="nav"><span class="t">附近站牌</span>'
     + '<button class="setlink" onclick="openSheet()">设置</button>'
@@ -2127,7 +2135,7 @@ function homeCard(main, other, win, station){
   }
 
   h += '<div class="ctop"><span class="lineno '+cls+'">'+esc(main.line)+'</span>'
-     + '<span class="toward">往 '+esc(main.toShort)+'</span>'
+     + '<span class="toward">往 <b>'+esc(main.toShort)+'</b></span>'
      + swapHtml + '</div>';
 
   h += '<div class="cmid" role="img" aria-label="' + esc(ariaText(main, station)) + '">'
@@ -2278,7 +2286,7 @@ function doSearch(){
             var hr = '#/b/' + encodeURIComponent(v.line) + '/' + dd.dir;
             h += '<div class="row srow" onclick="go(\'' + hr + '\')">'
                + '<span class="ln">' + esc(v.line) + '</span>'
-               + '<span class="dst">往 ' + esc(dd.toShort)
+               + '<span class="dst">往 <b>' + esc(dd.toShort) + '</b>'
                + '　<span class="dstop">' + dd.stopCount + ' 站</span></span>'
                + '<span class="arrow">›</span></div>';
           }
@@ -2779,8 +2787,12 @@ class Handler(BaseHTTPRequestHandler):
                     n = raw.strip()
                     if n and n not in faves:
                         faves.append(n)
-                self._json(build_nearby(lat, lon, max(100, min(3000, rad)),
-                                        faves=faves))
+                # 2 公里在市区能筛出七八十个站，只回 30 条会把大半挡掉，
+                # 老人又不知道底下还有 —— 按范围放宽，真实总数一起给前端，
+                # 让它在列表末尾老实说「还有多少个没列出来」
+                rad = max(100, min(3000, rad))
+                limit = 60 if rad >= 2000 else 40
+                self._json(build_nearby(lat, lon, rad, limit=limit, faves=faves))
 
             elif path == "/api/station":
                 name = (q.get("name") or [""])[0].strip()
