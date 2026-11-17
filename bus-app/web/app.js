@@ -17,12 +17,108 @@ function ls(k,v){
   }catch(e){ return null; }
 }
 
-function speak(text){
-  if(!speakOn || !window.speechSynthesis || !text) return;
+/* ---------------------------------------------------------- 字大小 */
+/* 1 标准 / 2 大 / 3 特大。默认「大」—— 这个 App 本来就是给看不清的人做的，
+   年轻人自己点回标准。字号在 CSS 里是一组变量，改档位就是换一组值。 */
+/* 调试用：地址加 ?fs=1|2|3 直接定档，方便截图核每档的样子 */
+(function(){
+  var m = (location.search || "").match("[?&]fs=([123])");
+  if(m){ ls("fs", m[1]); }
+})();
+
+function curFs(){
+  var v = parseInt(ls("fs") || "2", 10);
+  return (v === 1 || v === 3) ? v : 2;
+}
+
+function paintFs(v){
+  var bs = document.querySelectorAll(".fs");
+  for(var i = 0; i < bs.length; i++){
+    bs[i].className = "fs"
+      + (parseInt(bs[i].getAttribute("data-fs"), 10) === v ? " sel" : "");
+  }
+}
+
+function setFs(v){
+  ls("fs", String(v));
+  document.body.setAttribute("data-fs", String(v));
+  paintFs(v);
+}
+
+/* 尽早设上，别让人先看见一屏小字再跳大 */
+document.body.setAttribute("data-fs", String(curFs()));
+
+/* 调试用：地址加 ?dbg=1 时，把「这一页会念的那句话」写到页面顶上，
+   一眼能看出念的是什么 —— 光听声音核不了文案。 */
+(function(){
+  var val = "";
+  try{
+    Object.defineProperty(window, "_speech", {
+      get: function(){ return val; },
+      set: function(v){
+        val = v;
+        if(location.search.indexOf("dbg=1") < 0) return;
+        var d = document.getElementById("spkdbg");
+        if(!d){
+          d = document.createElement("div");
+          d.id = "spkdbg";
+          d.style.cssText = "position:fixed;left:0;top:0;right:0;z-index:9999;"
+            + "background:#FFF3CD;color:#111;font-size:12px;padding:6px;line-height:1.45";
+          document.body.appendChild(d);
+        }
+        d.textContent = "【会念】" + (v || "（空）");
+      }
+    });
+  }catch(e){}
+})();
+
+/* 念出来。手机上必须走原生 TTS —— Android 的 WebView 基本不支持
+   speechSynthesis，只有电脑浏览器预览时才会走到下面那段。 */
+function say(text){
+  if(!text) return;
+  var B = window.AndroidBridge;
+  if(B && B.speak){
+    try{ B.speak(text); return; }catch(e){}
+  }
+  if(!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
   var u = new SpeechSynthesisUtterance(text);
-  u.lang="zh-CN"; u.rate=0.85; u.pitch=1.0;
+  u.lang = "zh-CN"; u.rate = 0.85; u.pitch = 1.0;
   window.speechSynthesis.speak(u);
+}
+
+/* 到站提醒用的：只有开了「自动念」才出声 */
+function speak(text){
+  if(!speakOn || !text) return;
+  say(text);
+}
+
+/* 底部那个按钮：念当前这一页。文案是各页渲染时写进 _speech 的 ——
+   哪个页面最清楚自己这一屏要说什么。 */
+function speakPage(){
+  var t = window._speech || "";
+  if(!t){
+    showBanner("这页没什么可念的", "", false);
+    setTimeout(hideBanner, 1800);
+    return;
+  }
+  say(t);
+}
+
+/* 她到某个站多远。先看首页那份列表（不额外发请求），
+   没有就问一次 —— 从搜索直接点进来的情况列表是空的。 */
+function stationDistance(name){
+  for(var i = 0; i < _near.list.length; i++){
+    if(_near.list[i].name === name) return _near.list[i].dist;
+  }
+  return null;
+}
+
+/* 走到那个站要多久。直线距离 ×1.3 当实际路，速度按 50 米/分钟
+   （正常成年人 70-80，老人腿脚慢，300 米的路正好走 8 分钟）。 */
+function walkMinutes(meters){
+  if(meters === null || meters === undefined || meters < 0) return null;
+  return Math.max(1, Math.round(meters * 1.3 / 50));
 }
 
 function api(url){
@@ -104,6 +200,7 @@ function openSheet(){
   for(var j = 0; j < ts.length; j++){
     ts[j].className = "th" + (ts[j].getAttribute("data-sk") === cs ? " sel" : "");
   }
+  paintFs(curFs());
   // 这行字是给「到底改了没有」这个问题用的：手机拿到的页面是哪一版，一眼可见
   var bl = document.getElementById("buildline");
   if(bl) bl.textContent = "页面版本 " + (document.body.getAttribute("data-build") || "未知");
@@ -256,7 +353,7 @@ function stationRows(lines, station, limit){
 
     var href = '#/b/' + encodeURIComponent(v.line) + '/' + v.dir
              + '?st=' + encodeURIComponent(station);
-    h += '<div class="row' + (i === 0 ? " first" : "") + '" '
+    h += '<div class="row lrow' + (i === 0 ? " first" : "") + '" '
        + (hidden ? 'style="display:none"' : '') + ' data-late="' + (hidden ? 1 : 0) + '" '
        + 'onclick="go(\'' + href + '\')">'
        + '<span class="ln">' + esc(v.line) + '</span>'
@@ -591,6 +688,11 @@ function loadStation(name){
     if(!p.ok){ el.innerHTML = errBox("查不到", p.error); return; }
     _near.lstName = p.station;
     paintCurHead();
+    // 首页的「念一遍」：先说最近的站，再说这条线还有几分钟
+    if(location.hash.replace(/^#/, "") === "/" || location.hash === ""
+       || location.hash === "#"){
+      window._speech = homeSpeech(p);
+    }
     var ck = document.getElementById("clock");
     if(ck) ck.innerHTML = '<i class="live"></i>' + p.updated;
 
@@ -698,15 +800,44 @@ function viewBoard(line, dir, station, silent){
     html += '<div class="scroll home">';
     html += homeCard(p.main, p.other, p.win, p.station);
     html += '</div>';
+    // 「念一遍」统一交给底部那条常驻按钮，这里只留「这站的车」，
+    // 按钮大一号、占满一行 —— 一屏里不要出现两个念的入口
     html += '<div class="btnrow">'
-          + '<button class="btn s" onclick="go(\'#/s/\'+encodeURIComponent(p.station))">这站的车</button>'
-          + '<button class="btn p" onclick="toggleSpeak()">'+(speakOn?"念 ✓":"念一遍")+'</button>'
+          + '<button class="btn p" style="flex:1" '
+          + 'onclick="go(\'#/s/\'+encodeURIComponent(p.station))">这站的车</button>'
           + '</div>';
     el.innerHTML = html;
 
     centerMyStop();
     restorePick();
-    window._speech = mainSpeech(p.main, p.other);
+    var walkMin = walkMinutes(stationDistance(p.station));
+    window._speech = mainSpeech(p.main, walkMin);
+    // 列表里没有这个站（多半是从搜索直接点进来的），问一次距离；
+    // 连位置都还没有就先定位 —— 不知道她走到站台要几分钟，
+    // 「该出门了」这句话就没依据，宁可不念
+    if(walkMin === null){
+      (function(keepLine, keepDir, keepMain){
+        var ask = function(){
+          if(_near.lat === null) return;
+          api("/api/stdist?name=" + encodeURIComponent(keepMain.station)
+              + "&lat=" + _near.lat + "&lon=" + _near.lon)
+          .then(function(r){
+            if(!r || !r.ok) return;
+            if(location.hash.indexOf("#/b/" + encodeURIComponent(keepLine) + "/" + keepDir) !== 0) return;
+            window._speech = mainSpeech(keepMain.main, walkMinutes(r.dist));
+          });
+        };
+        if(_near.lat === null){
+          locate(function(v){
+            if(!v) return;
+            _near.lat = v.lat; _near.lon = v.lon;
+            ask();
+          });
+        } else {
+          ask();
+        }
+      })(line, dir, p);
+    }
     if(speakOn) speak(window._speech);
     _watch = {line: line, dir: dir, station: p.station};
     syncWatch();
@@ -851,19 +982,94 @@ function ariaText(m, station){
   return t;
 }
 
-function mainSpeech(main, other){
-  var t = "往"+main.toShort+"，";
-  if(main.status==="noroute") t += "这条线不经过这站";
-  else if(main.status==="here") t += "车在站上";
-  else if(main.status==="coming" && main.minutes!==null) t += (main.minutes===0?"车马上到":"还有"+main.minutes+"分钟");
-  else if(main.status==="waiting") t += "等发车";
-  else if(main.status==="closed") t += "已收班";
-  else t += "暂无车";
-  if(other){
-    t += "。反方向";
-    if(other.status==="coming" && other.minutes!==null) t += (other.minutes===0?"车马上到":"还有"+other.minutes+"分钟");
-    else if(other.status==="closed") t += "已收班";
-    else t += "暂无车";
+/* 站牌：同一条线的两个方向合成一句，别「36路…36路…」念两遍 */
+function stationSpeech(station, lines){
+  var groups = [], idx = {};
+  for(var i = 0; i < lines.length; i++){
+    var v = lines[i];
+    var mm = (v.minutes === 0) ? "马上到"
+           : (v.minutes === null || v.minutes === undefined) ? "没车" : v.minutes + "分钟";
+    var bit = "往" + (v.toShort || "") + mm;
+    if(idx.hasOwnProperty(v.line)){ groups[idx[v.line]].bits.push(bit); }
+    else { idx[v.line] = groups.length; groups.push({line: v.line, bits: [bit]}); }
+  }
+  var t = station + "站，";
+  for(var g = 0; g < groups.length && g < 3; g++){
+    t += (g ? "。" : "") + groups[g].line + "，" + groups[g].bits.join("、");
+  }
+  return t + "。";
+}
+
+/* 选方向：「125路两个方向。往火车站，还有3分钟。往附一医，还有8分钟。」 */
+function dirsSpeech(line, dirs){
+  var t = line + "，" + dirs.length + "个方向。", any = false;
+  for(var i = 0; i < dirs.length && i < 3; i++){
+    var v = dirs[i];
+    t += (i ? "。" : "") + "往" + (v.toShort || "");
+    if(v.minutes === 0){ t += "，马上到"; any = true; }
+    else if(v.minutes !== null && v.minutes !== undefined){
+      t += "，还有" + v.minutes + "分钟"; any = true;
+    }
+    else if(v.busCount){ t += "，" + v.busCount + "辆车在路上"; any = true; }
+  }
+  return t + (any ? "。" : "。点一个方向看几分钟到。");
+}
+
+/* 搜索结果：只念前两条线路，够她确认点对了没有 */
+function searchSpeech(kw, lines, stations){
+  var t = "找到";
+  if(lines.length) t += lines.length + "条线路";
+  if(stations.length) t += (lines.length ? "和" : "") + stations.length + "个站";
+  if(t === "找到") return "没找到" + kw + "。";
+  t += "。";
+  for(var i = 0; i < lines.length && i < 2; i++){ t += lines[i].line + "。"; }
+  if(!lines.length && stations.length){
+    t += "最近的站是" + stations[0].name + "。";
+  }
+  return t;
+}
+
+function homeSpeech(p){
+  var t = "";
+  var st = _near.list[0];
+  if(st) t += "最近的站是" + st.name + "，" + fmtDist(st.dist) + "。";
+  var lines = p.lines || [];
+  for(var i = 0; i < lines.length && i < 2; i++){
+    var v = lines[i];
+    t += v.line + "，往" + (v.toShort || "") + "，"
+       + (v.minutes === 0 ? "马上到"
+          : (v.minutes === null || v.minutes === undefined ? "没车" : "还有" + v.minutes + "分钟"))
+       + "。";
+  }
+  if(!lines.length && !st) t = "还没有定位到，点上面的搜索框找站名。";
+  return t;
+}
+
+function mainSpeech(main, walkMin){
+  var t = (main.line || "") + "，往" + (main.toShort || "") + "。";
+  if(main.status === "noroute") t += "这条线不经过这站。";
+  else if(main.status === "here") t += "车已经在站上，快上车。";
+  else if(main.status === "coming" && main.minutes !== null){
+    if(main.minutes === 0){
+      t += "车马上到，快上车。";
+    } else {
+      t += "还有" + main.minutes + "分钟";
+      if(main.stations !== null && main.stations !== undefined){
+        t += "，车在前面" + main.stations + "站。";
+      } else {
+        t += "。";
+      }
+    }
+  }
+  else if(main.status === "waiting") t += "车还没发车。";
+  else if(main.status === "closed") t += "今天收班了。";
+  else t += "暂时没有车。";
+
+  // 光报分钟数老人还是不知道走不走，跟她的步行时间比一句
+  if(walkMin && main.status === "coming" && main.minutes > 0){
+    if(main.minutes <= walkMin + 1) t += "该出门了。";
+    else if(main.minutes >= walkMin + 6) t += "不着急，坐一会儿再走。";
+    else t += "可以准备走了。";
   }
   return t;
 }
@@ -1018,7 +1224,7 @@ function midInner(main, station){
   var urgent = (main.status==="coming" && main.minutes!==null && main.minutes<=3);
   var s = "";
   if(main.status==="noroute"){
-    s += '<div class="stxt '+cls+'" style="font-size:30px;line-height:1.25">不经过 '+esc(station)+'站</div>'
+    s += '<div class="stxt '+cls+'" style="font-size:var(--fs-30_0);line-height:1.25">不经过 '+esc(station)+'站</div>'
        + '<div class="sub">下面是全程站点和车开到哪了</div>';
   } else if(main.status==="here"){
     s += '<div class="stxt '+cls+'">车在站上</div><div class="sub">快上车</div>';
@@ -1155,6 +1361,7 @@ function viewStation(name){
     el.innerHTML = html;
     var fb = document.getElementById("favbtn");
     if(fb) setFavBtn(fb, p.station);
+    window._speech = stationSpeech(p.station, lines);
   }).catch(function(){ el.innerHTML = errBox("连不上", "稍后再试"); });
 }
 
@@ -1219,7 +1426,7 @@ function doSearch(){
           for(var j = 0; j < v.dirs.length; j++){
             var dd = v.dirs[j];
             var hr = '#/b/' + encodeURIComponent(v.line) + '/' + dd.dir;
-            h += '<div class="row srow" onclick="go(\'' + hr + '\')">'
+            h += '<div class="row srow lrow" onclick="go(\'' + hr + '\')">'
                + '<span class="ln">' + esc(v.line) + '</span>'
                + '<span class="dst">往 <b>' + esc(dd.toShort) + '</b>'
                + '　<span class="dstop">' + dd.stopCount + ' 站</span></span>'
@@ -1228,7 +1435,7 @@ function doSearch(){
         } else {
           // 同名的其他线路：只列一行，点进去再选方向
           var href = '#/d/' + encodeURIComponent(v.line);
-          h += '<div class="row srow" onclick="go(\'' + href + '\')">'
+          h += '<div class="row srow lrow" onclick="go(\'' + href + '\')">'
              + '<span class="ln">' + esc(v.line) + '</span>'
              + '<span class="dst">' + esc(v.from) + ' → ' + esc(v.to) + '</span>'
              + '<span class="arrow">›</span></div>';
@@ -1266,6 +1473,7 @@ function doSearch(){
         + '比如温州不叫「火车站」，叫「火车温州站」</div>';
     }
     box.innerHTML = '<div class="panel">' + h + '</div>';
+    window._speech = searchSpeech(kw, lines, stations);
   }).catch(function(){ box.innerHTML = errBox("连不上", "稍后再试"); });
 }
 
@@ -1326,6 +1534,7 @@ function viewDirs(line, from){
     }
     html += '</div>';
     el.innerHTML = html;
+    window._speech = dirsSpeech(p.line, p.dirs);
   }).catch(function(){ el.innerHTML = errBox("连不上", "检查电脑上的程序是否还在运行"); });
 }
 
@@ -1396,6 +1605,7 @@ function viewLine(line, dir, focus){
 }
 
 function route(){
+  window._speech = "";          // 换页先清掉，别在这一页念出上一页的话
   var h = location.hash || "#/";
   var el = document.getElementById("app");
   if(timer){ clearInterval(timer); timer = null; }
@@ -1538,7 +1748,7 @@ if(location.search.indexOf("sheet=") >= 0){
     var addr = "";
     try{ addr = B.server(); }catch(e){}
     s.style.cssText = "margin-top:14px;padding-top:12px;border-top:1px solid #EFEEE8;"
-                    + "text-align:center;font-size:13px;color:#8A8F94;line-height:1.6";
+                    + "text-align:center;font-size:var(--fs-13_0);color:#8A8F94;line-height:1.6";
     s.textContent = addr
       ? ("连电脑 " + addr + " · 点了能改")
       : "自带数据 · 不连电脑也能用";

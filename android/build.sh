@@ -72,8 +72,8 @@ sed -i "s|data-build=\"[^\"]*\"|data-build=\"$BUILD_TAG\"|" "$OUT/assets/web/ind
   --java "$OUT/gen" \
   --min-sdk-version 21 \
   --target-sdk-version 34 \
-  --version-code 2 \
-  --version-name 1.1.0 \
+  --version-code 3 \
+  --version-name 1.2.0 \
   --auto-add-overlay
 echo "==> 资源编译完成"
 
@@ -121,19 +121,19 @@ fi
 "$JAVA" -jar "$BT/lib/apksigner.jar" sign \
   --ks "$KS" --ks-pass pass:bus123456 --key-pass pass:bus123456 \
   --v1-signing-enabled true --v2-signing-enabled true \
-  --out "$OUT/bus-1.1.0.apk" "$OUT/aligned.apk"
+  --out "$OUT/bus-1.2.0.apk" "$OUT/aligned.apk"
 
-"$JAVA" -jar "$BT/lib/apksigner.jar" verify "$OUT/bus-1.1.0.apk"
+"$JAVA" -jar "$BT/lib/apksigner.jar" verify "$OUT/bus-1.2.0.apk"
 echo "==> 签名校验通过"
 
 # 8. 归档到 dist/，并记下校验值与证书指纹（手机下载页要显示这两样）
 mkdir -p ../dist
-cp "$OUT/bus-1.1.0.apk" "../dist/bus-arrival-1.1.0.apk"
-"$JAVA" -jar "$BT/lib/apksigner.jar" verify --print-certs "../dist/bus-arrival-1.1.0.apk" > "$OUT/certs.txt"
+cp "$OUT/bus-1.2.0.apk" "../dist/bus-arrival-1.2.0.apk"
+"$JAVA" -jar "$BT/lib/apksigner.jar" verify --print-certs "../dist/bus-arrival-1.2.0.apk" > "$OUT/certs.txt"
 python - "$OUT" <<'PY'
 import hashlib, json, os, re, sys, datetime
 out = sys.argv[1]
-apk = os.path.join(os.path.dirname(out), "..", "dist", "bus-arrival-1.1.0.apk")
+apk = os.path.join(os.path.dirname(out), "..", "dist", "bus-arrival-1.2.0.apk")
 apk = os.path.abspath(apk)
 data = open(apk, "rb").read()
 cert = ""
@@ -143,7 +143,7 @@ for line in open(os.path.join(out, "certs.txt"), encoding="utf-8", errors="ignor
         break
 info = {
     "file": os.path.basename(apk),
-    "version": "1.1.0", "versionCode": 2,
+    "version": "1.2.0", "versionCode": 3,
     "size": len(data),
     "sha256": hashlib.sha256(data).hexdigest(),
     "cert": cert, "signed": "v1+v2",
@@ -171,6 +171,9 @@ idx = os.path.abspath(os.path.join(os.path.dirname(apk), "..", "index.html"))
 try:
     html = open(idx, encoding="utf-8").read()
     html = re.sub(r"bus-arrival-[0-9.]+(-[0-9a-f]{8})?\.apk", newname, html)
+    # 下载页链接里的 release tag 也要跟着走，否则新包名挂在旧 tag 下 = 404
+    html = re.sub(r"releases/download/v[0-9.]+/",
+                  "releases/download/v%s/" % info["version"], html)
     html = re.sub(r"(对不上就别装<br><code>)[0-9a-f]{64}", r"\g<1>" + info["sha256"], html)
     html = re.sub(r"(证书指纹<br><code>)[0-9a-f]{64}", r"\g<1>" + cert, html)
     open(idx, "w", encoding="utf-8").write(html)
@@ -179,4 +182,4 @@ except Exception as e:
     print("!! 同步 index.html 失败：", e)
 PY
 
-ls -lh "$OUT/bus-1.1.0.apk" ../dist/
+ls -lh "$OUT/bus-1.2.0.apk" ../dist/

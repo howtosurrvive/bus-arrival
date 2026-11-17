@@ -12,6 +12,7 @@ import android.location.LocationManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
+import android.speech.tts.TextToSpeech;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.InputType;
@@ -43,6 +44,7 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -67,6 +69,11 @@ public class MainActivity extends Activity {
     private Prefs prefs;
     private FrameLayout root;
     private WebView web;
+
+    /* 念出来用系统的语音合成。WebView 里的 speechSynthesis 在安卓上
+       基本是不响的（WebView 不支持 Web Speech API），所以必须走原生。 */
+    private TextToSpeech tts;
+    private boolean ttsReady = false;
     private boolean triedAssetFallback = false;
 
     @Override
@@ -84,6 +91,19 @@ public class MainActivity extends Activity {
 
         // 手机重启过、或者 App 被系统清掉过：打开时把盯站服务接回来
         if (prefs.watchOn()) BusService.start(this);
+
+        // 语音引擎初始化要几百毫秒，先起着；初始化完之前点「念一遍」会等不到声音，
+        // 但下一次点就有了
+        tts = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+            @Override public void onInit(int status) {
+                if (status != TextToSpeech.SUCCESS) { ttsReady = false; return; }
+                int r = tts.setLanguage(Locale.SIMPLIFIED_CHINESE);
+                ttsReady = r != TextToSpeech.LANG_MISSING_DATA
+                        && r != TextToSpeech.LANG_NOT_SUPPORTED;
+                tts.setSpeechRate(0.85f);       // 老人听得慢一点
+                tts.setPitch(1.0f);
+            }
+        });
     }
 
     /* ------------------------------------------------------------ 网页 */
@@ -457,6 +477,24 @@ public class MainActivity extends Activity {
             return true;
         }
 
+        /** 网页点「念一遍」时走这里。念之前先 stop，连点两下不会叠着念。 */
+        @JavascriptInterface
+        public void speak(String text) {
+            if (text == null || text.isEmpty()) return;
+            if (tts == null || !ttsReady) {
+                toast("手机还没准备好朗读，再点一次试试");
+                return;
+            }
+            tts.stop();
+            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "bus");
+        }
+
+        /** 网页里问一句：这台手机到底有没有能念的中文语音 */
+        @JavascriptInterface
+        public boolean canSpeak() {
+            return ttsReady;
+        }
+
         /** 给网页的坐标，形如 "27.964,120.747"；拿不到回空串。 */
         @JavascriptInterface
         public String getLocation() {
@@ -554,6 +592,11 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (tts != null) {
+            try { tts.stop(); tts.shutdown(); } catch (Exception ignored) {}
+            tts = null;
+            ttsReady = false;
+        }
         if (web != null) {
             root.removeView(web);
             web.destroy();

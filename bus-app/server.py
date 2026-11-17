@@ -425,6 +425,14 @@ def _dist_m(lat1, lon1, lat2, lon2):
     return 2 * R * math.asin(min(1.0, math.sqrt(a)))
 
 
+def station_dist(name, lat, lon):
+    """某个站离她多远（米）。站库没有它时返回 None —— 不编一个数出来。"""
+    pts = station_db().get(name)
+    if not pts:
+        return None
+    return int(round(min(_dist_m(lat, lon, p[0], p[1]) for p in pts)))
+
+
 def build_nearby(lat, lon, radius=500, limit=30, faves=None):
     """半径内的站 + 收藏的站。
 
@@ -2670,11 +2678,31 @@ def _theme_buttons():
     return "".join(out)
 
 
+SPK_ICON = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+            'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" '
+            'aria-hidden="true"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5H4z"/>'
+            '<path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a9 9 0 0 1 0 12"/>'
+            '</svg>')
+
 REMIND_DOM = (
+    # 底部常驻的「念一遍」：位置永远一样，不识字的人在哪个页面都能找到它
+    '<div class="spkbar"><button class="spkbtn" id="spkbtn" onclick="speakPage()">'
+    + SPK_ICON + '<span>念一遍</span></button></div>'
     '<div class="banner" id="banner"></div>'
     '<div class="mask" id="mask" onclick="closeSheet()"></div>'
     '<div class="sheet" id="sheet">'
     '<h4>设置</h4>'
+    '<div class="sect-t">字大小</div>'
+    '<div class="hint">点一下，整页的字跟着变</div>'
+    '<div class="fss">'
+    '<button class="fs" data-fs="1" onclick="setFs(1)">'
+    '<i style="font-size:17px">站</i><small>标准</small></button>'
+    '<button class="fs" data-fs="2" onclick="setFs(2)">'
+    '<i style="font-size:25px">站</i><small>大</small></button>'
+    '<button class="fs" data-fs="3" onclick="setFs(3)">'
+    '<i style="font-size:33px">站</i><small>特大</small></button>'
+    '</div>'
+    '<div class="thhint">看不清就选最右边那个</div>'
     '<div class="sect-t">到站响铃</div>'
     '<div class="hint">车还有几站时，提示一次并响一声</div>'
     '<div class="opts">'
@@ -2901,6 +2929,19 @@ class Handler(BaseHTTPRequestHandler):
                         lat = lon = None
                     self._json(build_search(kw, lat, lon))
 
+            elif path == "/api/stdist":
+                # 她到某个站多远。用来判断「现在出门赶不赶得上」，
+                # 不编数：站库没这个站就回 ok:false
+                nm = (q.get("name") or [""])[0].strip()
+                try:
+                    dla = float((q.get("lat") or [""])[0])
+                    dlo = float((q.get("lon") or [""])[0])
+                except ValueError:
+                    self._json({"ok": False, "error": "缺少坐标"})
+                else:
+                    d = station_dist(nm, dla, dlo)
+                    self._json({"ok": d is not None, "dist": d})
+
             elif path == "/api/data":
                 # 给 web/ 那一版（手机里自己算）当中转。
                 # 上游防盗链只认 Origin: https://h5.mygolbs.com，浏览器和 WebView
@@ -2976,11 +3017,21 @@ class Handler(BaseHTTPRequestHandler):
                             pass
                 sub = (q.get("p") or [""])[0]
                 sk = (q.get("skin") or ["c"])[0].lower()
+                # src=static 时预览的是 web/ 那一版（手机里跑的就是它），
+                # 顺带把字号档 fs 和假坐标 loc 透传进去
+                if (q.get("src") or [""])[0] == "static":
+                    arg = []
+                    if "fs" in q: arg.append("fs=" + q["fs"][0])
+                    if "loc" in q: arg.append("loc=" + q["loc"][0])
+                    if "sheet" in q: arg.append("sheet=" + q["sheet"][0])
+                    target = "/static/index.html" + ("?" + "&".join(arg) if arg else "") + sub
+                else:
+                    target = "/?skin=%s%s" % (sk, sub)
                 page = (
                     '<html><body style="margin:0;background:#777;display:flex;'
                     'justify-content:center;align-items:flex-start">'
-                    '<iframe src="/?skin=%s%s" style="width:%dpx;height:%dpx;border:0;'
-                    'background:#fff"></iframe></body></html>' % (sk, sub, w, hgt)
+                    '<iframe src="%s" style="width:%dpx;height:%dpx;border:0;'
+                    'background:#fff"></iframe></body></html>' % (target, w, hgt)
                 )
                 self._send(200, page, "text/html; charset=utf-8")
 

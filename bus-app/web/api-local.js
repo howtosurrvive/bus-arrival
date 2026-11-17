@@ -730,6 +730,24 @@
             return buildNearby(db, lat, lon, rad, lim, faves);
           });
         }
+      } else if (path === "/api/stdist") {
+        // 她到某个站多远。用来判断「现在出门赶不赶得上」。
+        // 站库里没有这个站就回 ok:false，不编一个距离出来
+        var dn = q.name, dla = numOrNull(q.lat), dlo = numOrNull(q.lon);
+        if (!dn || dla === null || dlo === null) {
+          p = Promise.resolve({ ok: false, error: "缺少站名或坐标" });
+        } else {
+          p = stationDb().then(function (db) {
+            var pts = db[dn];
+            if (!pts || !pts.length) return { ok: false };
+            var best = Infinity;
+            for (var i = 0; i < pts.length; i++) {
+              var d = distM(dla, dlo, pts[i][0], pts[i][1]);
+              if (d < best) best = d;
+            }
+            return { ok: true, dist: Math.round(best) };
+          });
+        }
       } else if (path === "/api/stloc") {
         p = q.name ? fetchPlatforms(q.name).then(function (pts) {
           return { ok: pts.length > 0, name: q.name, points: pts.length };
