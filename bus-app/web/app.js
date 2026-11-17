@@ -99,7 +99,7 @@ function speak(text){
    哪个页面最清楚自己这一屏要说什么。 */
 /* ------------------------------------------------- 自带声音（不依赖系统语音） */
 
-var _auCur = null, _auSeq = 0;
+var _auCur = null, _auSrc = [], _auSeq = 0;
 var _ac = null, _abuf = {}, _loading = {};
 
 function audioCtx(){
@@ -146,6 +146,9 @@ function loadSeg(id){
 function stopAudio(){
   _auSeq++;
   if(_auCur){ try{ _auCur.pause(); }catch(e){} _auCur = null; }
+  // Web Audio 那一路是一次性把整句排进时间轴的，光 pause 停不下来，得逐条 stop
+  for(var i = 0; i < _auSrc.length; i++){ try{ _auSrc[i].stop(0); }catch(e){} }
+  _auSrc = [];
 }
 
 /* 老 WebView 没有 Web Audio 时的退路：逐个 Audio 播，会有停顿，但能出声。 */
@@ -153,9 +156,11 @@ function playSegsFallback(segs){
   var seq = _auSeq, i = 0;
   (function next(){
     if(seq !== _auSeq || i >= segs.length) return;
-    var a = new Audio("audio/" + segs[i++] + ".mp3");
+    var s = segs[i++];
+    var a = new Audio("audio/" + s.a + ".mp3");
     _auCur = a;
-    a.onended = next;
+    var go = function(){ setTimeout(next, (s.p || 25) + 60); };
+    a.onended = go;
     a.onerror = next;
     var pr = a.play();
     if(pr && pr.catch){ pr.catch(function(){ next(); }); }
@@ -164,7 +169,12 @@ function playSegsFallback(segs){
 }
 
 /* 用打包进 APK 的片段拼一句话。手机没有中文语音引擎时走这条路 ——
-   声音是提前录好的，不依赖手机装过什么，也不需要联网。 */
+   声音是提前录好的，不依赖手机装过什么，也不需要联网。
+
+   两个细节决定了「像不像人说话」：
+   1. 每段只播真正发声的那一截（speechSpan），段间停顿由标点决定（p 毫秒）；
+   2. 每个片段首尾各加 8ms 淡入淡出 —— 不做的话接缝处会「咔」一声，
+      这正是听着发僵、像机器的一个来源。 */
 function playSegs(segs){
   stopAudio();
   if(!segs || !segs.length) return false;
@@ -172,19 +182,27 @@ function playSegs(segs){
   if(!ctx) return playSegsFallback(segs);
 
   var seq = _auSeq;
-  Promise.all(segs.map(loadSeg)).then(function(bufs){
+  Promise.all(segs.map(function(s){ return loadSeg(s.a); })).then(function(bufs){
     if(seq !== _auSeq) return;
-    var t = ctx.currentTime + 0.04, played = false;
+    var t = ctx.currentTime + 0.05, played = false, fade = 0.008;
     for(var i = 0; i < bufs.length; i++){
       var b = bufs[i];
       if(!b) continue;
       var sp = speechSpan(b);
       var src = ctx.createBufferSource();
       src.buffer = b;
-      src.connect(ctx.destination);
+      var g = ctx.createGain();
+      src.connect(g);
+      g.connect(ctx.destination);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(1, t + fade);
+      g.gain.setValueAtTime(1, t + Math.max(fade, sp.dur - fade));
+      g.gain.linearRampToValueAtTime(0, t + sp.dur);
       src.start(t, sp.off, sp.dur);
-      t += sp.dur + 0.02;           // 段间留 20ms，够断开又不拖沓
+      t += sp.dur + (segs[i].p || 25) / 1000;
       played = true;
+      _auCur = src;
+      _auSrc.push(src);
     }
     if(!played) playSegsFallback(segs);
   });
@@ -198,18 +216,19 @@ function setSpeech(o){
   // 先在后台把片段解码好，点「念一遍」时才有声音立刻出来
   var B = window.AndroidBridge;
   if(window._segs.length && !(B && B.canSpeak && B.canSpeak())){
-    for(var i = 0; i < window._segs.length; i++) loadSeg(window._segs[i]);
+    for(var i = 0; i < window._segs.length; i++) loadSeg(window._segs[i].a);
   }
   if(location.search.indexOf("dbg=1") >= 0){
     var d = document.getElementById("spkdbg");
-    if(d) d.textContent = d.textContent + " ｜片段:" + window._segs.length + " " + window._segs.slice(0, 12).join(",");
+    if(d) d.textContent = d.textContent + " ｜片段:" + window._segs.length + " "
+      + window._segs.slice(0, 12).map(function(s){ return s.a; }).join(",");
     // 顺便报一下解码结果和这句话会念多久 —— 核不了声音，至少能核时长
-    (function(ids){
-      if(!ids.length) return;
-      Promise.all(ids.map(loadSeg)).then(function(bs){
+    (function(items){
+      if(!items.length) return;
+      Promise.all(items.map(function(s){ return loadSeg(s.a); })).then(function(bs){
         var ok = 0, dur = 0;
         for(var i = 0; i < bs.length; i++){
-          if(bs[i]){ ok++; dur += speechSpan(bs[i]).dur + 0.035; }
+          if(bs[i]){ ok++; dur += speechSpan(bs[i]).dur + (items[i].p || 0) / 1000; }
         }
         var box = document.getElementById("spkdbg");
         if(box) box.textContent += " ｜解码 " + ok + "/" + bs.length
@@ -1123,15 +1142,43 @@ function ariaText(m, station){
    站名是开放集合，几万个，录不了 —— 离线版里站名的音频是 null，那句话会自然
    跳过「往 浙南科技城」，剩下「三十六路，还有十四分钟」照样听得懂。
 */
-function T(s, a){ return { s: s, a: a || null }; }
+function T(s, a, p){ return { s: s, a: a || null, p: p }; }
 
+/* 成句片段的上限。要和 gen_audio.py 里的 QMAX / AMAX / SMAX 一致 ——
+   q5 是「还有五分钟」一整段，a5 是「还有五分钟到站」，s5 是「车在前面五站」。
+   超出范围就退回「词 + 数字」拼接，照样能念。 */
+var QMAX = 59, AMAX = 59, SMAX = 30;
+
+/* 一个片段播完之后停多久。拼句听着别不别扭，一半靠这个：
+   句号后面留一口气，逗号后面小半口，词与词之间几乎不停。 */
+function pauseOf(s){
+  s = s || "";
+  if(/[。！？!?]$/.test(s)) return 260;
+  if(/[，、；：,;:]$/.test(s)) return 110;
+  return 25;
+}
+
+/* 片段列表。segs 里每项是 {a:文件名, p:播完后停多少毫秒}。
+   没有音频的字（站名、方向）只进 text，不进 segs —— 系统有语音引擎时念 text，
+   没有时就只播 segs 里有的那几段。 */
 function S(toks){
-  var text = "", segs = [];
+  var text = "", segs = [], lead = 0;
   for(var i = 0; i < toks.length; i++){
     var t = toks[i];
     if(!t) continue;
     text += t.s;
-    if(t.a) segs.push(t.a);
+    var ids = t.a ? (Object.prototype.toString.call(t.a) === "[object Array]" ? t.a : [t.a]) : [];
+    var p = t.p === undefined ? pauseOf(t.s) : t.p;
+    if(!ids.length){
+      if(segs.length) segs[segs.length - 1].p += p;
+      else lead += p;
+      continue;
+    }
+    for(var k = 0; k < ids.length; k++){
+      var pp = (k === ids.length - 1 ? p : 25);
+      if(k === 0 && lead){ pp += lead; lead = 0; }
+      segs.push({ a: ids[k], p: Math.min(pp, 600) });
+    }
   }
   return { text: text, segs: segs };
 }
@@ -1178,11 +1225,20 @@ function lineToks(name){
   return out;
 }
 
-/* 「还有 14 分钟」/「马上到」/「没车」 */
+/* 「还有 14 分钟」/「马上到」/「没车」。有整句音频就用整句，没有才回到词拼。 */
 function minToks(v){
   if(v.minutes === 0) return [T("马上到", "p_now")];
   if(v.minutes === null || v.minutes === undefined) return [T("没车")];
-  return [T("还有", "p_have")].concat(numToks(v.minutes)).concat([T("分钟", "p_min")]);
+  var n = Math.round(v.minutes);
+  if(n > 0 && n <= QMAX) return [T("还有" + n + "分钟", "q" + n)];
+  return [T("还有", "p_have")].concat(numToks(n)).concat([T("分钟", "p_min")]);
+}
+
+/* 「车在前面 9 站」。同样优先整句 */
+function aheadToks(n){
+  n = Math.round(n);
+  if(n > 0 && n <= SMAX) return [T("车在前面" + n + "站", "s" + n)];
+  return [T("车在前面", "p_ahead")].concat(numToks(n)).concat([T("站", "p_stop")]);
 }
 
 /* 站牌：同一条线的两个方向合成一句，别「36路…36路…」念两遍 */
@@ -1265,13 +1321,44 @@ function searchSpeech(kw, lines, stations){
 function homeSpeech(p){
   var toks = [], st = _near.list[0];
   if(st) toks.push(T("最近的站是" + st.name + "，" + fmtDist(st.dist) + "。"));
-  var lines = p.lines || [];
-  for(var i = 0; i < lines.length && i < 2; i++){
+  var lines = p.lines || [], station = p.station || _near.lstName || "";
+
+  /* 一个站牌同一条线通常有两个方向（36路 上行 + 下行），列表里是两行。
+     照行念就是「36路…36路…」，听着像卡住了 —— 先按线路归并，只念最快那班，
+     句尾说「到XX站」，一句话说完一条线。 */
+  var idx = {}, groups = [];
+  for(var i = 0; i < lines.length; i++){
     var v = lines[i];
-    toks = toks.concat(lineToks(v.line));
-    toks.push(T("，往"), T(v.toShort || ""), T("，"));
-    toks = toks.concat(minToks(v));
-    toks.push(T("。"));
+    var m = (v.minutes === null || v.minutes === undefined) ? 9999 : v.minutes;
+    if(idx.hasOwnProperty(v.line)){
+      var g0 = groups[idx[v.line]];
+      if(m < g0.m) groups[idx[v.line]] = { v: v, m: m };
+    } else {
+      idx[v.line] = groups.length;
+      groups.push({ v: v, m: m });
+    }
+  }
+
+  for(var g = 0; g < groups.length && g < 2; g++){
+    var it = groups[g].v;
+    toks = toks.concat(lineToks(it.line));
+    toks.push(T("，往" + (it.toShort || "")));
+    if(it.status === "here"){
+      toks.push(T("，车已经在站上。", "p_here"));
+    } else if(it.minutes === null || it.minutes === undefined){
+      toks.push(T("，暂时没有车。", "p_nocar"));
+    } else if(it.minutes === 0){
+      toks.push(T("，马上到。", "p_now"));
+    } else {
+      var n = Math.round(it.minutes);
+      if(n <= AMAX){
+        // 文本给系统语音念（带站名），自带音频只到「到站」—— 站名是开放集合，录不了
+        toks.push(T("，还有" + n + "分钟到" + stTitle(station) + "。", "a" + n));
+      } else {
+        toks = toks.concat(minToks(it));
+        toks.push(T("。"));
+      }
+    }
   }
   if(!lines.length && !st) toks.push(T("还没有定位到，点上面的搜索框找站名。"));
   return S(toks);
@@ -1285,15 +1372,21 @@ function mainSpeech(main, walkMin){
   else if(main.status === "coming" && main.minutes !== null){
     if(main.minutes === 0){
       toks.push(T("车"), T("马上到", "p_now"), T("，快上车。"));
-    } else {
-      toks.push(T("还有", "p_have"));
-      toks = toks.concat(numToks(main.minutes));
-      toks.push(T("分钟", "p_min"));
-      if(main.stations !== null && main.stations !== undefined){
-        toks.push(T("，车在前面", "p_ahead"));
-        toks = toks.concat(numToks(main.stations));
-        toks.push(T("站", "p_stop"));
+    } else if(main.stations !== null && main.stations !== undefined){
+      /* 「还有 5 分钟，车在前面 9 站」—— 两句合成一个片段，中间不留缝 */
+      var mn = Math.round(main.minutes), sn = Math.round(main.stations);
+      if(mn > 0 && mn <= QMAX && sn > 0 && sn <= SMAX){
+        toks.push(T("还有" + mn + "分钟", "q" + mn, 140));
+        toks.push(T("，车在前面" + sn + "站", "s" + sn));
       }
+      else {
+        toks = toks.concat(minToks(main));
+        toks.push(T("，"));
+        toks = toks.concat(aheadToks(sn));
+      }
+      toks.push(T("。"));
+    } else {
+      toks = toks.concat(minToks(main));
       toks.push(T("。"));
     }
   }

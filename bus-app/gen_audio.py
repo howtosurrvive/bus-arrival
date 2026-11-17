@@ -29,12 +29,23 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "web", "audio")
 
 # 音色：晓晓，普通话女声，吐字清楚。
-# 语速 +8%（比正常略快一点点，拼句后总时长才压得住）—— 原来 -12% 用在整句上还行，但拼句时每段的
-# 拖音叠在一起，听起来又快又顿。要慢也是靠段与段之间留间隔，不是每段拖长。
+# 语速 **+0%（正常语速）**。不要再加：V1.2.3 用过 +12%，听感是「赶、调门发紧」，
+# 用户第一反应就是「语调别扭」。搜索到的一手经验也是「rate 用 +0%，+8% 会明显赶、
+# 情感直接丢掉」。要把一句压短，靠减少拼接点，不是靠把每个字念快。
+#
+# 更根本的一条：**逐词合成是错的**（B 站/腾讯云那篇实战的结论同样是「逐句 TTS 再拼接
+# 就会出现语调断裂，像机器人念课文」）。一个词单独念，TTS 会当成一句话收尾 —— 降调、
+# 拖长、字尾收音，接下一个词就断成一段一段。所以下面除了「词」，还预录了**成句片段**：
+#   q{n} = 还有{n}分钟        a{n} = 还有{n}分钟到站       s{n} = 车在前面{n}站
+# 这三个家族覆盖了绝大部分播报，一句话的拼接点从 9 段降到 3-4 段。
 VOICE = "zh-CN-XiaoxiaoNeural"
-RATE = "+12%"
+RATE = "+0%"
 
 CN = "零一二三四五六七八九"
+
+# 成句片段的上限，必须和 app.js 里的 QMAX / AMAX / SMAX 一致。
+# 超出上限的词法退回到「词 + 数字」拼接，照样能念，只是没那么顺。
+QMAX, AMAX, SMAX = 59, 59, 30
 
 
 def cn_num(n):
@@ -82,6 +93,13 @@ def items():
     out = []
     for n in range(100):
         out.append(("n%d" % n, cn_num(n)))
+    # 成句片段：整句合成，语调是连着念出来的，不是一个个字拼的
+    for n in range(1, QMAX + 1):
+        out.append(("q%d" % n, "还有%s分钟" % cn_num(n)))
+    for n in range(1, AMAX + 1):
+        out.append(("a%d" % n, "还有%s分钟到站" % cn_num(n)))
+    for n in range(1, SMAX + 1):
+        out.append(("s%d" % n, "车在前面%s站" % cn_num(n)))
     # 线路号里的字母：K125、B105、JD36 这些
     for ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
         out.append(("l" + ch, ch))
