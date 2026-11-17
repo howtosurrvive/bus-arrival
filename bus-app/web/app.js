@@ -78,7 +78,9 @@ function say(text){
   if(!text) return;
   var B = window.AndroidBridge;
   if(B && B.speak){
-    try{ B.speak(text); return; }catch(e){}
+    try{
+      if(B.speak(text) !== false) return;    // false = 这台机器念不了，往下走
+    }catch(e){}
   }
   if(!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
@@ -95,14 +97,59 @@ function speak(text){
 
 /* 底部那个按钮：念当前这一页。文案是各页渲染时写进 _speech 的 ——
    哪个页面最清楚自己这一屏要说什么。 */
+/* ------------------------------------------------- 自带声音（不依赖系统语音） */
+
+var _auCur = null, _auSeq = 0;
+
+function stopAudio(){
+  _auSeq++;
+  if(_auCur){ try{ _auCur.pause(); }catch(e){} _auCur = null; }
+}
+
+/* 用打包进 APK 的片段拼一句话。手机没有中文语音引擎时走这条路 ——
+   声音是提前录好的，不依赖手机装过什么，也不需要联网。 */
+function playSegs(segs){
+  stopAudio();
+  if(!segs || !segs.length) return false;
+  var seq = _auSeq, i = 0;
+  (function next(){
+    if(seq !== _auSeq || i >= segs.length) return;
+    var a = new Audio("audio/" + segs[i++] + ".mp3");
+    _auCur = a;
+    a.onended = next;
+    a.onerror = next;                 // 缺一段就跳过，别把整句卡死
+    var pr = a.play();
+    if(pr && pr.catch){ pr.catch(function(){ next(); }); }
+  })();
+  return true;
+}
+
+function setSpeech(o){
+  o = o || { text: "", segs: [] };
+  window._speech = o.text;
+  window._segs = o.segs || [];
+  if(location.search.indexOf("dbg=1") >= 0){
+    var d = document.getElementById("spkdbg");
+    if(d) d.textContent = d.textContent + " ｜片段:" + window._segs.length + " " + window._segs.slice(0, 12).join(",");
+  }
+}
+
 function speakPage(){
-  var t = window._speech || "";
-  if(!t){
+  var hasText = !!(window._speech || "");
+  var segs = window._segs || [];
+  if(!hasText && !segs.length){
     showBanner("这页没什么可念的", "", false);
     setTimeout(hideBanner, 1800);
     return;
   }
-  say(t);
+  // 手机上有能念中文的引擎就用它（带站名，信息更全）；
+  // 没有就换成自带的音频 —— 不再弹「还没准备好朗读」。
+  var B = window.AndroidBridge;
+  if(B && B.canSpeak && B.canSpeak() && hasText){
+    say(window._speech);
+    return;
+  }
+  if(!playSegs(segs) && hasText) say(window._speech);
 }
 
 /* 她到某个站多远。先看首页那份列表（不额外发请求），
@@ -691,7 +738,7 @@ function loadStation(name){
     // 首页的「念一遍」：先说最近的站，再说这条线还有几分钟
     if(location.hash.replace(/^#/, "") === "/" || location.hash === ""
        || location.hash === "#"){
-      window._speech = homeSpeech(p);
+      setSpeech(homeSpeech(p));
     }
     var ck = document.getElementById("clock");
     if(ck) ck.innerHTML = '<i class="live"></i>' + p.updated;
@@ -811,7 +858,7 @@ function viewBoard(line, dir, station, silent){
     centerMyStop();
     restorePick();
     var walkMin = walkMinutes(stationDistance(p.station));
-    window._speech = mainSpeech(p.main, walkMin);
+    setSpeech(mainSpeech(p.main, walkMin));
     // 列表里没有这个站（多半是从搜索直接点进来的），问一次距离；
     // 连位置都还没有就先定位 —— 不知道她走到站台要几分钟，
     // 「该出门了」这句话就没依据，宁可不念
@@ -824,7 +871,7 @@ function viewBoard(line, dir, station, silent){
           .then(function(r){
             if(!r || !r.ok) return;
             if(location.hash.indexOf("#/b/" + encodeURIComponent(keepLine) + "/" + keepDir) !== 0) return;
-            window._speech = mainSpeech(keepMain.main, walkMinutes(r.dist));
+            setSpeech(mainSpeech(keepMain.main, walkMinutes(r.dist)));
           });
         };
         if(_near.lat === null){
@@ -982,96 +1029,199 @@ function ariaText(m, station){
   return t;
 }
 
+/* ---------------------------------------------------- 播报：一句话，两种念法
+
+   系统有中文语音引擎 → 念完整文字（含站名），信息最全。
+   系统没有（不少精简 ROM 就是没装）→ 用打包进 APK 的 149 段词和数字拼出来。
+
+   所以一句话由「片段」描述：每段既有文字、也有对应音频（没有音频的记 null）。
+   站名是开放集合，几万个，录不了 —— 离线版里站名的音频是 null，那句话会自然
+   跳过「往 浙南科技城」，剩下「三十六路，还有十四分钟」照样听得懂。
+*/
+function T(s, a){ return { s: s, a: a || null }; }
+
+function S(toks){
+  var text = "", segs = [];
+  for(var i = 0; i < toks.length; i++){
+    var t = toks[i];
+    if(!t) continue;
+    text += t.s;
+    if(t.a) segs.push(t.a);
+  }
+  return { text: text, segs: segs };
+}
+
+/* 数字。音频只有 0-99，三位数用「一 + 百 + 五十九」拼 */
+function numToks(n, raw){
+  n = Math.round(n);
+  if(raw === undefined) raw = String(n);
+  if(n < 0) return [T(raw)];
+  if(n < 100) return [T(raw, "n" + n)];
+  if(n < 1000){
+    var h = Math.floor(n / 100), r = n % 100;
+    var out = [T(raw, "n" + h), T("", "p_hundred")];
+    if(r === 0) return out;
+    if(r < 10) out.push(T("", "n0"));          // 一百零五
+    out.push(T("", "n" + r));
+    return out;
+  }
+  return [T(raw)];
+}
+
+/* 线路号：36路 / K125 / B105 / JD36 —— 字母、数字、路字各自成段 */
+function lineToks(name){
+  var out = [], i = 0;
+  name = name || "";
+  while(i < name.length){
+    var ch = name.charAt(i);
+    if(ch >= "0" && ch <= "9"){
+      var j = i;
+      while(j < name.length && name.charAt(j) >= "0" && name.charAt(j) <= "9") j++;
+      out = out.concat(numToks(parseInt(name.slice(i, j), 10), name.slice(i, j)));
+      i = j;
+    } else if(/[A-Za-z]/.test(ch)){
+      out.push(T(ch, "l" + ch.toUpperCase()));
+      i++;
+    } else if(ch === "路"){
+      out.push(T("路", "p_road"));
+      i++;
+    } else {
+      out.push(T(ch));
+      i++;
+    }
+  }
+  return out;
+}
+
+/* 「还有 14 分钟」/「马上到」/「没车」 */
+function minToks(v){
+  if(v.minutes === 0) return [T("马上到", "p_now")];
+  if(v.minutes === null || v.minutes === undefined) return [T("没车")];
+  return [T("还有", "p_have")].concat(numToks(v.minutes)).concat([T("分钟", "p_min")]);
+}
+
 /* 站牌：同一条线的两个方向合成一句，别「36路…36路…」念两遍 */
 function stationSpeech(station, lines){
-  var groups = [], idx = {};
+  var toks = [T(station + "站，")], groups = [], idx = {};
   for(var i = 0; i < lines.length; i++){
     var v = lines[i];
-    var mm = (v.minutes === 0) ? "马上到"
-           : (v.minutes === null || v.minutes === undefined) ? "没车" : v.minutes + "分钟";
-    var bit = "往" + (v.toShort || "") + mm;
-    if(idx.hasOwnProperty(v.line)){ groups[idx[v.line]].bits.push(bit); }
-    else { idx[v.line] = groups.length; groups.push({line: v.line, bits: [bit]}); }
+    if(idx.hasOwnProperty(v.line)) groups[idx[v.line]].items.push(v);
+    else { idx[v.line] = groups.length; groups.push({ line: v.line, items: [v] }); }
   }
-  var t = station + "站，";
   for(var g = 0; g < groups.length && g < 3; g++){
-    t += (g ? "。" : "") + groups[g].line + "，" + groups[g].bits.join("、");
+    if(g) toks.push(T("。"));
+    toks = toks.concat(lineToks(groups[g].line));
+    for(var k = 0; k < groups[g].items.length; k++){
+      var it = groups[g].items[k];
+      toks.push(T("，"), T("往"), T(it.toShort || ""));
+      if(it.minutes !== null && it.minutes !== undefined) toks.push(T("，"));
+      toks = toks.concat(minToks(it));
+    }
+    toks.push(T("。"));
   }
-  return t + "。";
+  return S(toks);
 }
 
 /* 选方向：「125路两个方向。往火车站，还有3分钟。往附一医，还有8分钟。」 */
 function dirsSpeech(line, dirs){
-  var t = line + "，" + dirs.length + "个方向。", any = false;
+  var toks = lineToks(line);
+  toks.push(T("，"));
+  toks = toks.concat(numToks(dirs.length));
+  toks.push(T("个方向", "p_dirs"), T("。"));
+  var any = false;
   for(var i = 0; i < dirs.length && i < 3; i++){
     var v = dirs[i];
-    t += (i ? "。" : "") + "往" + (v.toShort || "");
-    if(v.minutes === 0){ t += "，马上到"; any = true; }
+    if(i) toks.push(T("。"));
+    toks.push(T("往"), T(v.toShort || ""));
+    if(v.minutes === 0){ toks.push(T("，马上到", "p_now")); any = true; }
     else if(v.minutes !== null && v.minutes !== undefined){
-      t += "，还有" + v.minutes + "分钟"; any = true;
+      toks.push(T("，"));
+      toks = toks.concat(minToks(v));
+      any = true;
     }
-    else if(v.busCount){ t += "，" + v.busCount + "辆车在路上"; any = true; }
+    else if(v.busCount){
+      toks.push(T("，"));
+      toks = toks.concat(numToks(v.busCount));
+      toks.push(T("辆车在路上", "p_buses"));
+      any = true;
+    }
   }
-  return t + (any ? "。" : "。点一个方向看几分钟到。");
+  toks.push(T(any ? "。" : "。点一个方向，看几分钟到", any ? null : "p_tapdir"));
+  return S(toks);
 }
 
 /* 搜索结果：只念前两条线路，够她确认点对了没有 */
 function searchSpeech(kw, lines, stations){
-  var t = "找到";
-  if(lines.length) t += lines.length + "条线路";
-  if(stations.length) t += (lines.length ? "和" : "") + stations.length + "个站";
-  if(t === "找到") return "没找到" + kw + "。";
-  t += "。";
-  for(var i = 0; i < lines.length && i < 2; i++){ t += lines[i].line + "。"; }
-  if(!lines.length && stations.length){
-    t += "最近的站是" + stations[0].name + "。";
+  var toks = [], n = 0;
+  if(lines.length){
+    toks.push(T("找到", "p_found"));
+    toks = toks.concat(numToks(lines.length));
+    toks.push(T("条线路", "p_lines"));
+    n = 1;
   }
-  return t;
+  if(stations.length){
+    toks.push(n ? T("和", "p_and") : T("找到", "p_found"));
+    toks = toks.concat(numToks(stations.length));
+    toks.push(T("个站", "p_stops"));
+    n = 1;
+  }
+  if(!n) return S([T("没找到" + kw + "。", "p_notfound")]);
+  toks.push(T("。"));
+  for(var i = 0; i < lines.length && i < 2; i++){
+    toks = toks.concat(lineToks(lines[i].line));
+    toks.push(T("。"));
+  }
+  if(!lines.length && stations.length){
+    toks.push(T("最近的站是" + stations[0].name + "。"));
+  }
+  return S(toks);
 }
 
 function homeSpeech(p){
-  var t = "";
-  var st = _near.list[0];
-  if(st) t += "最近的站是" + st.name + "，" + fmtDist(st.dist) + "。";
+  var toks = [], st = _near.list[0];
+  if(st) toks.push(T("最近的站是" + st.name + "，" + fmtDist(st.dist) + "。"));
   var lines = p.lines || [];
   for(var i = 0; i < lines.length && i < 2; i++){
     var v = lines[i];
-    t += v.line + "，往" + (v.toShort || "") + "，"
-       + (v.minutes === 0 ? "马上到"
-          : (v.minutes === null || v.minutes === undefined ? "没车" : "还有" + v.minutes + "分钟"))
-       + "。";
+    toks = toks.concat(lineToks(v.line));
+    toks.push(T("，往"), T(v.toShort || ""), T("，"));
+    toks = toks.concat(minToks(v));
+    toks.push(T("。"));
   }
-  if(!lines.length && !st) t = "还没有定位到，点上面的搜索框找站名。";
-  return t;
+  if(!lines.length && !st) toks.push(T("还没有定位到，点上面的搜索框找站名。"));
+  return S(toks);
 }
 
 function mainSpeech(main, walkMin){
-  var t = (main.line || "") + "，往" + (main.toShort || "") + "。";
-  if(main.status === "noroute") t += "这条线不经过这站。";
-  else if(main.status === "here") t += "车已经在站上，快上车。";
+  var toks = lineToks(main.line);
+  toks.push(T("，往"), T(main.toShort || ""), T("。"));
+  if(main.status === "noroute") toks.push(T("这条线不经过这站。"));
+  else if(main.status === "here") toks.push(T("车已经在站上，快上车。", "p_here"));
   else if(main.status === "coming" && main.minutes !== null){
     if(main.minutes === 0){
-      t += "车马上到，快上车。";
+      toks.push(T("车"), T("马上到", "p_now"), T("，快上车。"));
     } else {
-      t += "还有" + main.minutes + "分钟";
+      toks.push(T("还有", "p_have"));
+      toks = toks.concat(numToks(main.minutes));
+      toks.push(T("分钟", "p_min"));
       if(main.stations !== null && main.stations !== undefined){
-        t += "，车在前面" + main.stations + "站。";
-      } else {
-        t += "。";
+        toks.push(T("，车在前面", "p_ahead"));
+        toks = toks.concat(numToks(main.stations));
+        toks.push(T("站", "p_stop"));
       }
+      toks.push(T("。"));
     }
   }
-  else if(main.status === "waiting") t += "车还没发车。";
-  else if(main.status === "closed") t += "今天收班了。";
-  else t += "暂时没有车。";
+  else if(main.status === "waiting") toks.push(T("车还没发车。", "p_notstart"));
+  else if(main.status === "closed") toks.push(T("今天收班了。", "p_closed"));
+  else toks.push(T("暂时没有车。", "p_nocar"));
 
-  // 光报分钟数老人还是不知道走不走，跟她的步行时间比一句
   if(walkMin && main.status === "coming" && main.minutes > 0){
-    if(main.minutes <= walkMin + 1) t += "该出门了。";
-    else if(main.minutes >= walkMin + 6) t += "不着急，坐一会儿再走。";
-    else t += "可以准备走了。";
+    if(main.minutes <= walkMin + 1) toks.push(T("该出门了。", "p_go"));
+    else if(main.minutes >= walkMin + 6) toks.push(T("不着急，坐一会儿再走。", "p_wait"));
+    else toks.push(T("可以准备走了。", "p_ready"));
   }
-  return t;
+  return S(toks);
 }
 
 /* ---------------------------------------------- 点站点，看车多久到
@@ -1361,7 +1511,7 @@ function viewStation(name){
     el.innerHTML = html;
     var fb = document.getElementById("favbtn");
     if(fb) setFavBtn(fb, p.station);
-    window._speech = stationSpeech(p.station, lines);
+    setSpeech(stationSpeech(p.station, lines));
   }).catch(function(){ el.innerHTML = errBox("连不上", "稍后再试"); });
 }
 
@@ -1473,7 +1623,7 @@ function doSearch(){
         + '比如温州不叫「火车站」，叫「火车温州站」</div>';
     }
     box.innerHTML = '<div class="panel">' + h + '</div>';
-    window._speech = searchSpeech(kw, lines, stations);
+    setSpeech(searchSpeech(kw, lines, stations));
   }).catch(function(){ box.innerHTML = errBox("连不上", "稍后再试"); });
 }
 
@@ -1534,7 +1684,7 @@ function viewDirs(line, from){
     }
     html += '</div>';
     el.innerHTML = html;
-    window._speech = dirsSpeech(p.line, p.dirs);
+    setSpeech(dirsSpeech(p.line, p.dirs));
   }).catch(function(){ el.innerHTML = errBox("连不上", "检查电脑上的程序是否还在运行"); });
 }
 
@@ -1606,6 +1756,7 @@ function viewLine(line, dir, focus){
 
 function route(){
   window._speech = "";          // 换页先清掉，别在这一页念出上一页的话
+  window._segs = [];
   var h = location.hash || "#/";
   var el = document.getElementById("app");
   if(timer){ clearInterval(timer); timer = null; }

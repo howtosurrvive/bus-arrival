@@ -362,6 +362,7 @@ _WEB_MIME = {
     ".css": "text/css; charset=utf-8",
     ".json": "application/json; charset=utf-8",
     ".png": "image/png",
+    ".mp3": "audio/mpeg",
     ".svg": "image/svg+xml",
 }
 _st_db = None

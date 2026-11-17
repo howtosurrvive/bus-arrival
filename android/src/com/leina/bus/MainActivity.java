@@ -113,6 +113,12 @@ public class MainActivity extends Activity {
             web = new WebView(this);
             WebSettings s = web.getSettings();
             s.setJavaScriptEnabled(true);
+            // 「念一遍」是一串短音频接力播的，第二段起不再有用户手势。
+            // WebView 默认会拦这种播放 —— 关掉，否则只能念出第一个词。
+            s.setMediaPlaybackRequiresUserGesture(false);
+            // 「念一遍」是一串短音频接力播的，第二段起不再有用户手势。
+            // WebView 默认会拦这种播放 —— 关掉，否则只能念出第一个词。
+            s.setMediaPlaybackRequiresUserGesture(false);
             s.setDomStorageEnabled(true);
             s.setDatabaseEnabled(true);
             s.setCacheMode(WebSettings.LOAD_NO_CACHE);
@@ -241,6 +247,7 @@ public class MainActivity extends Activity {
         else if (rel.endsWith(".css")) mime = "text/css";
         else if (rel.endsWith(".json")) mime = "application/json";
         else if (rel.endsWith(".png")) mime = "image/png";
+        else if (rel.endsWith(".mp3")) mime = "audio/mpeg";
         else if (rel.endsWith(".svg")) mime = "image/svg+xml";
         try {
             InputStream in = getAssets().open("web/" + rel);
@@ -477,16 +484,15 @@ public class MainActivity extends Activity {
             return true;
         }
 
-        /** 网页点「念一遍」时走这里。念之前先 stop，连点两下不会叠着念。 */
+        /** 网页点「念一遍」时走这里。念之前先 stop，连点两下不会叠着念。
+         *  返回 false 表示这台机器念不了 —— 网页会退到自带的音频，别再弹提示了。 */
         @JavascriptInterface
-        public void speak(String text) {
-            if (text == null || text.isEmpty()) return;
-            if (tts == null || !ttsReady) {
-                toast("手机还没准备好朗读，再点一次试试");
-                return;
-            }
+        public boolean speak(String text) {
+            if (text == null || text.isEmpty()) return false;
+            if (tts == null || !ttsReady) return false;
             tts.stop();
             tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "bus");
+            return true;
         }
 
         /** 网页里问一句：这台手机到底有没有能念的中文语音 */

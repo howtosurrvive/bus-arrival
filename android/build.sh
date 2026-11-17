@@ -72,8 +72,8 @@ sed -i "s|data-build=\"[^\"]*\"|data-build=\"$BUILD_TAG\"|" "$OUT/assets/web/ind
   --java "$OUT/gen" \
   --min-sdk-version 21 \
   --target-sdk-version 34 \
-  --version-code 3 \
-  --version-name 1.2.0 \
+  --version-code 4 \
+  --version-name 1.2.1 \
   --auto-add-overlay
 echo "==> 资源编译完成"
 
@@ -121,19 +121,19 @@ fi
 "$JAVA" -jar "$BT/lib/apksigner.jar" sign \
   --ks "$KS" --ks-pass pass:bus123456 --key-pass pass:bus123456 \
   --v1-signing-enabled true --v2-signing-enabled true \
-  --out "$OUT/bus-1.2.0.apk" "$OUT/aligned.apk"
+  --out "$OUT/bus-1.2.1.apk" "$OUT/aligned.apk"
 
-"$JAVA" -jar "$BT/lib/apksigner.jar" verify "$OUT/bus-1.2.0.apk"
+"$JAVA" -jar "$BT/lib/apksigner.jar" verify "$OUT/bus-1.2.1.apk"
 echo "==> 签名校验通过"
 
 # 8. 归档到 dist/，并记下校验值与证书指纹（手机下载页要显示这两样）
 mkdir -p ../dist
-cp "$OUT/bus-1.2.0.apk" "../dist/bus-arrival-1.2.0.apk"
-"$JAVA" -jar "$BT/lib/apksigner.jar" verify --print-certs "../dist/bus-arrival-1.2.0.apk" > "$OUT/certs.txt"
+cp "$OUT/bus-1.2.1.apk" "../dist/bus-arrival-1.2.1.apk"
+"$JAVA" -jar "$BT/lib/apksigner.jar" verify --print-certs "../dist/bus-arrival-1.2.1.apk" > "$OUT/certs.txt"
 python - "$OUT" <<'PY'
 import hashlib, json, os, re, sys, datetime
 out = sys.argv[1]
-apk = os.path.join(os.path.dirname(out), "..", "dist", "bus-arrival-1.2.0.apk")
+apk = os.path.join(os.path.dirname(out), "..", "dist", "bus-arrival-1.2.1.apk")
 apk = os.path.abspath(apk)
 data = open(apk, "rb").read()
 cert = ""
@@ -143,7 +143,7 @@ for line in open(os.path.join(out, "certs.txt"), encoding="utf-8", errors="ignor
         break
 info = {
     "file": os.path.basename(apk),
-    "version": "1.2.0", "versionCode": 3,
+    "version": "1.2.1", "versionCode": 4,
     "size": len(data),
     "sha256": hashlib.sha256(data).hexdigest(),
     "cert": cert, "signed": "v1+v2",
@@ -182,4 +182,4 @@ except Exception as e:
     print("!! 同步 index.html 失败：", e)
 PY
 
-ls -lh "$OUT/bus-1.2.0.apk" ../dist/
+ls -lh "$OUT/bus-1.2.1.apk" ../dist/
