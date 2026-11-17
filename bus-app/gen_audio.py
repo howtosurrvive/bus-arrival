@@ -28,9 +28,11 @@ except ImportError:
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "web", "audio")
 
-# 音色：晓晓，普通话女声，吐字清楚。语速放慢一点，老人听着不费劲。
+# 音色：晓晓，普通话女声，吐字清楚。
+# 语速 +8%（比正常略快一点点，拼句后总时长才压得住）—— 原来 -12% 用在整句上还行，但拼句时每段的
+# 拖音叠在一起，听起来又快又顿。要慢也是靠段与段之间留间隔，不是每段拖长。
 VOICE = "zh-CN-XiaoxiaoNeural"
-RATE = "-12%"
+RATE = "+12%"
 
 CN = "零一二三四五六七八九"
 
@@ -90,7 +92,7 @@ def items():
 
 async def one(name, text, sem):
     path = os.path.join(OUT, name + ".mp3")
-    if os.path.exists(path) and os.path.getsize(path) > 0:
+    if os.path.exists(path) and os.path.getsize(path) > 0 and "--force" not in sys.argv:
         return name, "skip"
     async with sem:
         for attempt in range(3):

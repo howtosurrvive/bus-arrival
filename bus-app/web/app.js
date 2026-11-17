@@ -100,10 +100,67 @@ function speak(text){
 /* ------------------------------------------------- 自带声音（不依赖系统语音） */
 
 var _auCur = null, _auSeq = 0;
+var _ac = null, _abuf = {}, _loading = {};
+
+function audioCtx(){
+  if(_ac) return _ac;
+  var C = window.AudioContext || window.webkitAudioContext;
+  if(!C) return null;
+  try{ _ac = new C(); }catch(e){ return null; }
+  if(_ac.state === "suspended"){ try{ _ac.resume(); }catch(e){} }
+  return _ac;
+}
+
+/* 每段 mp3 的首尾都带着静音，直接一段接一段播就是一顿一顿的。
+   这里把它解码成波形，量出真正发声的那一段，只播这一段 ——
+   段间停顿从原来的三四百毫秒降到几十毫秒。 */
+function speechSpan(buf){
+  var d = buf.getChannelData(0), n = d.length, thr = 0.018;
+  var head = 0, tail = n - 1;
+  while(head < n && Math.abs(d[head]) < thr) head++;
+  while(tail > head && Math.abs(d[tail]) < thr) tail--;
+  if(tail <= head) return { off: 0, dur: buf.duration };
+  return {
+    off: Math.max(0, head / buf.sampleRate - 0.015),
+    dur: Math.max(0.05, (tail - head) / buf.sampleRate + 0.05)
+  };
+}
+
+function loadSeg(id){
+  if(_abuf[id]) return Promise.resolve(_abuf[id]);
+  if(_loading[id]) return _loading[id];
+  var ctx = audioCtx();
+  if(!ctx) return Promise.resolve(null);
+  _loading[id] = fetch("audio/" + id + ".mp3")
+    .then(function(r){ return r.arrayBuffer(); })
+    .then(function(ab){
+      return new Promise(function(res, rej){
+        ctx.decodeAudioData(ab, res, function(){ rej(new Error("decode")); });
+      });
+    })
+    .then(function(b){ _abuf[id] = b; return b; })
+    .catch(function(){ return null; });
+  return _loading[id];
+}
 
 function stopAudio(){
   _auSeq++;
   if(_auCur){ try{ _auCur.pause(); }catch(e){} _auCur = null; }
+}
+
+/* 老 WebView 没有 Web Audio 时的退路：逐个 Audio 播，会有停顿，但能出声。 */
+function playSegsFallback(segs){
+  var seq = _auSeq, i = 0;
+  (function next(){
+    if(seq !== _auSeq || i >= segs.length) return;
+    var a = new Audio("audio/" + segs[i++] + ".mp3");
+    _auCur = a;
+    a.onended = next;
+    a.onerror = next;
+    var pr = a.play();
+    if(pr && pr.catch){ pr.catch(function(){ next(); }); }
+  })();
+  return true;
 }
 
 /* 用打包进 APK 的片段拼一句话。手机没有中文语音引擎时走这条路 ——
@@ -111,16 +168,26 @@ function stopAudio(){
 function playSegs(segs){
   stopAudio();
   if(!segs || !segs.length) return false;
-  var seq = _auSeq, i = 0;
-  (function next(){
-    if(seq !== _auSeq || i >= segs.length) return;
-    var a = new Audio("audio/" + segs[i++] + ".mp3");
-    _auCur = a;
-    a.onended = next;
-    a.onerror = next;                 // 缺一段就跳过，别把整句卡死
-    var pr = a.play();
-    if(pr && pr.catch){ pr.catch(function(){ next(); }); }
-  })();
+  var ctx = audioCtx();
+  if(!ctx) return playSegsFallback(segs);
+
+  var seq = _auSeq;
+  Promise.all(segs.map(loadSeg)).then(function(bufs){
+    if(seq !== _auSeq) return;
+    var t = ctx.currentTime + 0.04, played = false;
+    for(var i = 0; i < bufs.length; i++){
+      var b = bufs[i];
+      if(!b) continue;
+      var sp = speechSpan(b);
+      var src = ctx.createBufferSource();
+      src.buffer = b;
+      src.connect(ctx.destination);
+      src.start(t, sp.off, sp.dur);
+      t += sp.dur + 0.02;           // 段间留 20ms，够断开又不拖沓
+      played = true;
+    }
+    if(!played) playSegsFallback(segs);
+  });
   return true;
 }
 
@@ -128,9 +195,27 @@ function setSpeech(o){
   o = o || { text: "", segs: [] };
   window._speech = o.text;
   window._segs = o.segs || [];
+  // 先在后台把片段解码好，点「念一遍」时才有声音立刻出来
+  var B = window.AndroidBridge;
+  if(window._segs.length && !(B && B.canSpeak && B.canSpeak())){
+    for(var i = 0; i < window._segs.length; i++) loadSeg(window._segs[i]);
+  }
   if(location.search.indexOf("dbg=1") >= 0){
     var d = document.getElementById("spkdbg");
     if(d) d.textContent = d.textContent + " ｜片段:" + window._segs.length + " " + window._segs.slice(0, 12).join(",");
+    // 顺便报一下解码结果和这句话会念多久 —— 核不了声音，至少能核时长
+    (function(ids){
+      if(!ids.length) return;
+      Promise.all(ids.map(loadSeg)).then(function(bs){
+        var ok = 0, dur = 0;
+        for(var i = 0; i < bs.length; i++){
+          if(bs[i]){ ok++; dur += speechSpan(bs[i]).dur + 0.035; }
+        }
+        var box = document.getElementById("spkdbg");
+        if(box) box.textContent += " ｜解码 " + ok + "/" + bs.length
+                 + " 实念 " + dur.toFixed(2) + "秒";
+      });
+    })(window._segs.slice());
   }
 }
 
