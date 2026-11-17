@@ -1,4 +1,0 @@
-Signer #1 certificate DN: CN=LeiNa Valve, OU=Bus, O=LeiNa, L=Wenzhou, ST=Zhejiang, C=CN
-Signer #1 certificate SHA-256 digest: ed1ffbdf37800405bad522e2296c720404967e6a5cb253774cdeb30d0c0c9102
-Signer #1 certificate SHA-1 digest: e409caf1782e050aa39267795abb3dd92a0ffe49
-Signer #1 certificate MD5 digest: f6672605ce5ab65b0943fa54ec999db7

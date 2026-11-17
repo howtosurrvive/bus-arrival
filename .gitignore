@@ -5,7 +5,8 @@ __pycache__/
 Thumbs.db
 
 # 安卓构建中间件（源码保留，产物另存在 dist/）
-android/build/
+android/build*/
+android/build-*/
 android/gen/
 
 # 内部工作数据
