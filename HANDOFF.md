@@ -64,13 +64,16 @@
 ├── .github/workflows/
 │   ├── release.yml           打 tag 自动发 Release（安装包作为附件）
 │   └── pages.yml             自动把下载页发到 GitHub Pages（只发页面和 apk）
-├── index.html                对外的手机下载页（Pages 发布的是它的 site/ 副本）
-├── APK安装与测试.html        手机端安装与验收步骤
-├── 手机测试清单.html          人工验收清单
-├── 查询流程说明.html          交互规格（改 UI 前必读）
-├── 老人版公交App方案.html     立项期方案论证（历史文档，决策由来）
-├── 老人版公交_离线演示.html   不联网也能看的界面演示
+├── index.html                对外的手机下载页（Pages 发布的是 site/ 副本）
+├── docs/
+│   ├── qr-download.png       下载页二维码（发给别人扫）
+│   └── archive/              各阶段方案稿与测试稿，**只作留档**：
+│       ├── 配色方案对比.html / 配色比较.png   为什么最终是 c/d/e 三套
+│       ├── 老人版公交_离线演示.html           V1.0 界面留档（不是现行版本）
+│       ├── 手机测试清单.html / 查询流程说明.html
+│       └── APK安装与测试.html / UI交互优化方案.html / 定位与附近站点测试.html / 老人版公交App方案.html
 ├── README.md                 快速上手
+├── 代码考古-历史包袱清单.md   哪些是故意设计、哪些是包袱、哪些可删
 └── HANDOFF.md                本文件
 ```
 
@@ -296,8 +299,8 @@ python build_stations.py --limit 30   # 先跑 30 条线看看
            build_dirs()             一条线的两个方向（搜线路时用）
            build_line()             一条线一个方向的完整详情
            build_search()           搜线路（走上游）/ 搜站名（走本地库）
-页面       page_html()             组 HTML（CSS 来自 skins.py，JS 是常量）
-           JS 常量                 页面全部前端逻辑，见下
+页面       page_html()             组 HTML（CSS/JS 都从 web/ 读，读不到直接抛错）
+           web/app.js              页面全部前端逻辑（唯一一份，别再往 server.py 里拷）
 HTTP       Handler.do_GET          路由：/ /api/* /icon.png /manifest.json /demo /_preview
 ```
 
@@ -320,7 +323,7 @@ bus-app/build_stations.py  抓全市站点生成 stations.json（见 5.4），�
 > 静默刷新失败（接口挂了）时保持旧画面不动，不把错误页糊上去；`paintBoard()` 返回 `false`
 > 表示贴不上（换了线路、DOM 不在了），这时才退回首屏重绘。
 
-**前端 JS 的关键函数**（都在 `server.py` 的 `JS` 常量里）：
+**前端 JS 的关键函数**（都在 `bus-app/web/app.js` 里）：
 
 ```
 viewHome()      首页（站牌列表 + 搜索框）
@@ -344,8 +347,10 @@ centerMyStop()  把「你在这」滚到屏幕合适的位置
 | `c` | **默认**：白卡 + V2 优化层，深蓝 | ✅ 深蓝 | 默认 / `?skin=c` |
 | `d` | 暖橘（底色暖白、主色深橘棕） | ✅ 暖橘 | `?skin=d` |
 | `e` | 晴空（底色冷白、主色亮蓝，橙红点缀） | ✅ 晴空 | `?skin=e` |
-| `a` | 早期白卡（无 V2 优化层） | — | `?skin=a` |
-| `b` | 深色版 | — | `?skin=b` |
+
+> 早期的 `a`（素纸）和 `b`（站牌，深色）两套设计方向已于 2026-11-17 删除：
+> 选中白卡之后它们就没有入口了，只剩手敲 `?skin=a|b` 能打开，`/demo` 还默认取 `a`。
+> 现在 `SKINS` 只有 c/d/e，`?skin=` 传不认识的值会退回 `DEFAULT_SKIN`。
 
 `d` / `e` 由 `_tint(css, 映射表)` 一次性正则替换 hex 生成（`_THEME_WARM` / `_THEME_SKY`），
 **不复制 CSS、不改任何布局**。加一套新配色的成本就是再写一张颜色映射表，
@@ -368,7 +373,7 @@ centerMyStop()  把「你在这」滚到屏幕合适的位置
 > 换 APK 图标时要跟默认配色对上：用户把默认改成暖橘，打包就传 `warm`。
 > 手机桌面的图标是装的时候定的，网页里换色不会改桌面图标 —— 这是正常的。
 
-三套配色的对照图在根目录 `配色比较.png`（可直接发人），细版在 `配色方案对比.html`。
+三套配色的对照图在 `docs/archive/配色比较.png`（可直接发人），细版在 `docs/archive/配色方案对比.html`。
 
 ### 6.2b 附近站点与定位（V1.1 新增）
 
@@ -677,12 +682,13 @@ V1.2.3 那版被用户判了「语调听着很别扭」。原因不是音色，�
 | 段 | 行号 | 用在哪 | 漏改的后果 |
 | --- | --- | --- | --- |
 | `CSS_A` | ~11 | 白卡基础 | |
-| `CSS_B` | ~333 | **只有 skin `b`（深色版）用**，线上不用 | 改了以为生效，实际白卡没这条 |
 | `V2_OVERRIDE` | ~601 | 覆盖层，白卡最终生效的那段 | |
 
-真实事故：`.btn:active` 写进了 `CSS_B`，线上白卡完全没有按压反馈。
-只打开 `?skin=b` 看是对的，所以当时以为改好了。**改任何交互样式都要在
-`?skin=c`（默认白卡）下确认**，或者在 `V2_OVERRIDE` 里加。
+> `CSS_B` 已于 2026-11-17 随 skin `b` 一起删除（见 6.2 节说明）。
+
+真实事故（发生在 `CSS_B` 还在的时候）：`.btn:active` 写进了 `CSS_B`，线上白卡完全没有按压反馈。
+只打开 `?skin=b` 看是对的，所以当时以为改好了 —— **这就是"第二份样式"的代价**。
+现在只剩一份，改任何交互样式都在 `?skin=c`（默认白卡）下确认，或者直接改 `V2_OVERRIDE`。
 
 **按压反馈不能只靠 `:active`**：移动端 WebView 要等你抬手判完是点击还是滑动
 才决定算不算「按下」，所以纯 CSS 常常不触发。JS 里用事件委托加 `.down` 类
@@ -705,7 +711,7 @@ V1.2.3 那版被用户判了「语调听着很别扭」。原因不是音色，�
 | `Api.java` | 只做一件事：问 `http://<地址>/api/board?line=&dir=&station=`，解析成 `Board{status, stations, minutes, toShort}` |
 | `Prefs.java` | 五个字段：server / line / dir / station / at |
 
-**网页 ↔ 原生的桥**（`server.py` 的 `JS` 里）：
+**网页 ↔ 原生的桥**（`web/app.js` 的 `bridge()`）：
 
 ```js
 function bridge(){ return (typeof AndroidBridge !== "undefined") ? AndroidBridge : null; }
@@ -792,9 +798,8 @@ git tag -f -a v<版本号> -m "..." && git push --force origin refs/tags/v<版�
 # 1. Python 语法
 python -c "import ast;ast.parse(open('bus-app/server.py',encoding='utf-8').read())"
 
-# 2. 前端 JS 语法（server.py 里的 JS 常量导出后校验）
-cd bus-app && python -c "
-import server; open('_p.js','w',encoding='utf-8').write(server.JS)" && node --check _p.js && rm _p.js
+# 2. 前端 JS 语法（直接校验 web/app.js，前端唯一真相）
+cd bus-app && node --check web/app.js
 
 # 3. 服务起得来，接口返回的是事实不是编的
 cd bus-app && python server.py &
@@ -824,6 +829,10 @@ curl -s "http://127.0.0.1:8765/api/board?line=36路&dir=1&station=石坦"
     加字号三档就是最终形态；曾计划参考 impeccable / taste-skill / ui-ux-pro-max 出三版
     重设计，已放弃。后续只修可用性问题，不动视觉结构 —— 老人已经认熟了现有布局，
     换版式等于让她重学一遍。
+11. **前端只准有一份，服务端不许再放副本（2026-11-17 定）。** V1.0 把整份前端写在
+    `server.py` 的两个字符串里，V1.1 抽成 `web/` 之后那两个副本留了下来，成了"web/ 丢了
+    就静默退回 V1.0"的陷阱。现在 `_web_file()` 读不到直接抛错，`page_html()` 不再有兜底链。
+    **以后新增页面只改 `web/`，不要在 Python 里内联 HTML/CSS/JS。**
 
 ---
 

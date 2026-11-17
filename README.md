@@ -36,7 +36,8 @@ python build_stations.py --merge  # 只补新站
 | 网页 + 本地服务 | `bus-app/` | 电脑上双击 `bus-app/启动.bat`，手机浏览器打开窗口里显示的地址 |
 | 前端（手机里跑的那份） | `bus-app/web/` | `index.html` + `app.js` + `api-local.js` + `skins/` + `stations.json`，打包进 APK 的 `assets/web` |
 | 安卓 App | `android/` | 装到手机上，后台也能响铃 |
-| 交付物 / 说明页 | 根目录 `*.html` | 直接双击用浏览器看 |
+| 下载页 | 根目录 `index.html` | 网页版下载页，也是 GitHub Pages 的入口 |
+| 历史文档 | `docs/archive/` | 各阶段的方案稿与测试稿，**只作留档**，别当现行说明看 |
 
 ## 字看不清怎么办
 
@@ -57,7 +58,7 @@ python build_stations.py --merge  # 只补新站
 选方向   → 「36路，2个方向。往浙南科技城，2辆车在路上。」
 ```
 
-**手机没装中文语音也能念** —— 常用词和数字（149 段）已经录好打包在 App 里，
+**手机没装中文语音也能念** —— 常用词、数字和整句短语（297 段）已经录好打包在 App 里，
 系统没有语音引擎时就用它们拼出这句话，只是不含站名（站名几万个，录不了）：
 「三十六路，还有十四分钟，车在前面九站。该出门了。」
 
@@ -66,10 +67,20 @@ python build_stations.py --merge  # 只补新站
 
 ## 装到手机上：不依赖电脑
 
-手机安装包在 `dist/bus-arrival-1.1.0-*.apk`（约 240 KB）。
+安装包在 `dist/`（当前 `bus-arrival-1.2.4-12303cc3.apk`，约 3.3 MB，v1+v2 签名）。
 
 **V1.1.0 起 App 自带页面和全市站库，自己上网查，不需要电脑、不需要服务器。**
 出门在外只要有网就能用。想在家走电脑（局域网更快、更省流量）也行，在设置里填地址即可。
+
+手机上怎么拿：
+
+- 下载页（推荐）：https://howtosurrvive.github.io/bus-arrival/ —— 页面上挂了四条直链
+  （Release / Pages / jsDelivr / raw），一条打不开就换下一条
+- Release 列表：https://github.com/howtosurrvive/bus-arrival/releases
+- 想直接发给别人扫：`docs/qr-download.png` 就是下载页的二维码
+
+文件名和校验值**以 `dist/` 为准**（`dist/apk-info.json` 里记着 sha256）。
+下载页上那个哈希对不上就别装 —— 说明拿到的是 CDN 缓存的旧包。
 
 ## 电脑上跑（开发预览 / 不想装 App 时）
 
@@ -79,34 +90,22 @@ python build_stations.py --merge  # 只补新站
 3. 手机连同一个 WiFi，浏览器打开 http://<电脑IP>:8765
 ```
 
-## 装成 App
-
-手机安装包在 `dist/bus-arrival-1.0.0.apk`（25 KB，已 v1+v2 签名）。
-
-**手机上怎么下载**：仓库根目录的 `index.html` 是专门的下载页，开了 GitHub Pages 之后，
-手机浏览器打开 `https://howtosurrvive.github.io/bus-arrival/` 就能下载；
-不装 Pages 也能用这三条现成直链：
-
-- https://cdn.jsdelivr.net/gh/howtosurrvive/bus-arrival@v1.0.1/dist/bus-arrival-1.0.0.apk
-- https://raw.githubusercontent.com/howtosurrvive/bus-arrival/v1.0.1/dist/bus-arrival-1.0.0.apk
-
-默认服务器地址已经写进包里，手机和电脑在同一个 WiFi 下就不用再配置。
-
 ## 打包 APK
 
 需要 JDK 17 和 Android SDK build-tools（工具链说明见 `HANDOFF.md`）。
 
 ```bash
 cd android
-bash build.sh              # 自动探测本机 IP 作为默认地址
-bash build.sh 192.168.1.9  # 或者手动指定
+bash build.sh                          # 默认：自带数据，不连电脑
+bash build.sh http://192.168.1.9:8765  # 想默认连电脑上的 server.py 才传地址
 ```
 
-产物：`android/build/bus-1.0.0.apk`
+产物在 `android/build-<月日时分>/bus-1.2.4.apk`；正式包会被自动复制到 `dist/`，
+并同步改写下载页上的文件名、SHA-256、证书指纹。**别手改下载页上的哈希**。
 
 ## 文档
 
 - `HANDOFF.md` —— **交接报告**：架构、代码地图、构建方法、已知限制、换设备怎么接着干
-- `查询流程说明.html` —— 三步查询流程的图示
-- `手机测试清单.html` —— 手机上逐项验收
-- `老人版公交_离线演示.html` —— 不联网也能看的界面演示
+- `代码考古-历史包袱清单.md` —— 哪些设计是故意的、哪些是历史包袱、哪些可以删
+- `docs/archive/` —— 各阶段的方案稿（配色对比、V1.0 界面留档、测试清单），**只作留档**
+- `docs/qr-download.png` —— 下载页二维码，可以发给别人扫
