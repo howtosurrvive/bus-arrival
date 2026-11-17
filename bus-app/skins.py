@@ -1,10 +1,16 @@
 # -*- coding: utf-8 -*-
-"""两套视觉皮肤。
+"""三套配色：c 深蓝（默认，白卡）、d 暖橘、e 晴空。
 
-A = 素纸：纯白纸面、细线分隔、只在首页浮一张卡。极简，像打印的时刻表。
-B = 站牌：米灰纸背景、首页一块深蓝实心电子站牌、其余页面白面板浮起。
+底色都来自同一份 CSS_A，再叠两层补丁：
+  V2_OVERRIDE  交互与版式修正（按压态、行高、安全区…）
+  FS_LAYOUT    字号三档放大后的版式补丁
+d/e 只是把 CSS_A 里的颜色变量按主题表替换一遍（见 _tint）。
 
-两套都遵守同一条底线：正文对比度 >= 4.5:1，关键数字 >= 7:1，
+早就下线、2026-11-17 彻底删掉的：A「素纸」、B「站牌」两套设计方向 ——
+它们是"选视觉方向"阶段的产物，选中白卡（现在的 c）之后就没有入口了，
+只有 ?skin=a|b 这种手敲地址能打开。/demo 曾经默认取 a，一并改成 c。
+
+底线：正文对比度 >= 4.5:1，关键数字 >= 7:1，
 不做渐变字、不做半透明正文、不靠颜色单独传递信息。
 """
 
@@ -429,275 +435,6 @@ body{
 """
 
 
-CSS_B = r"""
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%}
-html{background:#D4D5CC}
-body{
-  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
-  background:#E8E9E1;color:#12171C;display:flex;flex-direction:column;overflow:hidden;
-  -webkit-font-smoothing:antialiased;
-  max-width:420px;margin:0 auto;
-}
-
-/* ---------------------------------------------------------- 顶栏 */
-.nav{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:20px 20px 13px}
-.nav .t{font-size:var(--fs-22_0);font-weight:700;letter-spacing:-.4px;color:#0F2537}
-.nav .r{
-  margin-left:auto;display:inline-flex;align-items:center;gap:6px;
-  font-size:var(--fs-14_0);color:#75786F;font-weight:500;font-variant-numeric:tabular-nums;
-}
-.live{
-  width:6px;height:6px;border-radius:50%;background:#1F9E5A;
-  box-shadow:0 0 0 3px rgba(31,158,90,.15);flex-shrink:0;
-}
-.back{
-  font-size:var(--fs-16_0);color:#37475A;background:none;border:none;
-  font-family:inherit;padding:2px 10px 2px 0;cursor:pointer;font-weight:600;
-}
-
-.scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 14px 16px;min-height:0;scrollbar-width:none}
-.scroll::-webkit-scrollbar{width:0;height:0;display:none}
-.scroll.flush{padding:10px 0 16px}
-.scroll.home{display:flex;flex-direction:column;padding:0 14px 14px}
-
-/* ---------------------------------------------------------- 深色站牌 */
-.card{
-  background:linear-gradient(168deg,#123A5C 0%,#0B2743 52%,#071A2D 100%);
-  border-radius:26px;padding:22px 20px 16px;color:#fff;
-  position:relative;overflow:hidden;cursor:pointer;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.11),
-             0 24px 50px -30px rgba(7,26,45,.95),
-             0 3px 10px rgba(7,26,45,.16);
-}
-.card.up,.card.dn{background:linear-gradient(168deg,#123A5C 0%,#0B2743 52%,#071A2D 100%)}
-.scroll.home .card{flex:1;min-height:0;display:flex;flex-direction:column}
-.card::after{
-  content:"";position:absolute;left:-54px;top:-124px;width:250px;height:250px;
-  border-radius:50%;background:radial-gradient(circle,rgba(96,176,255,.14),transparent 68%);
-  pointer-events:none;
-}
-
-.ctop{display:flex;align-items:center;gap:10px;position:relative;z-index:1}
-.lineno{
-  font-size:var(--fs-17_0);font-weight:800;letter-spacing:-.2px;line-height:1.15;
-  background:#fff;color:#0B2743;border-radius:9px;padding:5px 11px;
-  flex-shrink:0;
-}
-.lineno.up,.lineno.dn{color:#0B2743}
-.toward{
-  font-size:var(--fs-14_5);color:rgba(255,255,255,.74);flex:1;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.toward b{font-size:var(--fs-16_5);font-weight:600;color:#fff;letter-spacing:-.2px}
-.swapbtn{
-  margin-left:auto;flex-shrink:0;display:inline-flex;align-items:center;gap:6px;
-  border:1px solid rgba(255,255,255,.26);background:rgba(255,255,255,.14);color:#fff;
-  border-radius:999px;padding:7px 12px;
-  font-size:var(--fs-12_5);font-weight:600;font-family:inherit;
-  cursor:pointer;line-height:1.2;white-space:nowrap;
-}
-.swapbtn .si{font-size:var(--fs-13_0);color:rgba(255,255,255,.66)}
-.swapbtn b{font-size:var(--fs-14_5);font-weight:700;color:#FFD07A}
-
-.cmid{margin-top:16px;position:relative;z-index:1}
-.main{display:flex;align-items:flex-end;gap:5px}
-.min{
-  font-size:var(--fs-92_0);font-weight:800;line-height:.82;letter-spacing:-5px;
-  color:#fff;font-variant-numeric:tabular-nums;
-}
-.min.up,.min.dn{color:#fff}
-.unit{font-size:var(--fs-22_0);font-weight:600;color:rgba(255,255,255,.66);letter-spacing:0;padding-bottom:10px}
-.unit.up,.unit.dn{color:rgba(255,255,255,.62)}
-.stxt{
-  font-size:var(--fs-44_0);font-weight:800;line-height:1.05;letter-spacing:-1.5px;
-  margin-top:12px;color:#fff;
-}
-.stxt.up,.stxt.dn{color:#fff}
-.sub{font-size:var(--fs-16_5);color:rgba(255,255,255,.68);margin-top:13px;line-height:1.5}
-.sub b{font-weight:700;color:#fff}
-.go{
-  display:inline-block;background:#F5A524;color:#231500;
-  border-radius:7px;padding:3px 9px;font-size:var(--fs-13_5);font-weight:700;
-  margin-right:7px;letter-spacing:0;
-}
-
-.swin{
-  margin-top:15px;padding-top:13px;border-top:1px solid rgba(255,255,255,.13);
-  position:relative;z-index:1;
-  flex:1;min-height:0;display:flex;flex-direction:column;
-}
-.swabove{font-size:var(--fs-12_5);color:rgba(255,255,255,.62);padding:0 0 5px;flex-shrink:0}
-.swrow{
-  position:relative;display:flex;align-items:center;gap:10px;
-  flex:1;min-height:36px;padding-left:23px;
-}
-.swrow::before{
-  content:"";position:absolute;left:4px;top:0;bottom:0;
-  width:1.5px;background:rgba(255,255,255,.24);
-}
-.swrow:first-child::before{top:50%}
-.swrow:last-child::before{bottom:50%}
-.swrow .d{
-  position:absolute;left:0;top:50%;transform:translateY(-50%);
-  width:9px;height:9px;border-radius:50%;background:#0C2743;
-  border:1.5px solid rgba(255,255,255,.32);box-sizing:border-box;
-}
-.swrow.mine .d{border:none;background:#fff;box-shadow:0 0 0 4px rgba(255,255,255,.17)}
-.swrow.bus .d{border:none;background:#F5A524;box-shadow:0 0 0 4px rgba(245,165,36,.22)}
-.swrow .n{
-  font-size:var(--fs-17_5);color:rgba(255,255,255,.76);flex:0 1 auto;letter-spacing:-.1px;
-  max-width:68%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.swrow::after{content:"";flex:1 1 0;height:0}
-.swrow.mine .n{font-weight:700;color:#fff}
-.swrow .tb{
-  font-size:var(--fs-11_0);font-weight:700;color:#231500;background:#F5A524;
-  border-radius:5px;padding:2px 7px;
-}
-.swrow .tm2{
-  font-size:var(--fs-11_0);font-weight:700;color:#0B2743;background:#fff;
-  border-radius:5px;padding:2px 7px;
-}
-
-.cfoot{
-  display:flex;align-items:center;margin-top:6px;padding-top:13px;
-  border-top:1px solid rgba(255,255,255,.13);
-  position:relative;z-index:1;flex-shrink:0;
-}
-.swall{
-  font-size:var(--fs-15_0);color:rgba(255,255,255,.92);font-weight:600;
-  white-space:nowrap;display:inline-flex;align-items:center;gap:4px;
-}
-
-/* ---------------------------------------------------------- 列表 */
-.sec{font-size:var(--fs-12_5);color:#7B7E74;margin:14px 18px 8px;font-weight:600;letter-spacing:.3px}
-
-#lst{background:#fff;border-radius:22px;margin:0 14px;overflow:hidden;
-     box-shadow:0 1px 2px rgba(15,37,55,.05)}
-#lst .row:last-child{border-bottom:none}
-
-.panel{background:#fff;border-radius:22px;margin:10px 0;overflow:hidden;
-       box-shadow:0 1px 2px rgba(15,37,55,.05)}
-.panel .sec{margin:14px 16px 6px}
-.panel .row{padding-left:16px;padding-right:16px}
-.panel .row:last-child{border-bottom:none}
-
-.row{
-  display:flex;align-items:center;gap:12px;
-  padding:18px 16px;background:#fff;border-bottom:1px solid #F2F3EC;cursor:pointer;
-}
-.row:active{background:#F7F8F2}
-.row .ln{
-  font-size:var(--fs-16_0);font-weight:800;color:#fff;background:#123A5C;
-  border-radius:8px;padding:5px 9px;min-width:70px;text-align:center;
-  letter-spacing:-.2px;font-variant-numeric:tabular-nums;flex-shrink:0;
-}
-.row .dst{flex:1;font-size:var(--fs-15_0);color:#6E7168;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.row .tm{
-  font-size:var(--fs-24_0);font-weight:800;color:#0B2743;text-align:right;
-  white-space:nowrap;font-variant-numeric:tabular-nums;letter-spacing:-.8px;
-  min-width:64px;
-}
-.row .tm.hot{color:#C2410C;font-size:var(--fs-18_0);letter-spacing:0}
-.row .tm.wait{font-size:var(--fs-15_0);font-weight:500;color:#8E9188;letter-spacing:0}
-.row .arrow{color:#C9CCC2;font-size:var(--fs-16_0)}
-.row.first{border-top:none}
-.srow .ln{
-  background:none;color:#0B2743;padding:0;min-width:auto;
-  margin-right:2px;font-size:var(--fs-17_0);border-radius:0;text-align:left;
-}
-
-.more{
-  margin:10px 14px 0;padding:17px;border-radius:16px;
-  text-align:center;font-size:var(--fs-15_5);color:#123A5C;cursor:pointer;
-  font-weight:600;background:#fff;
-  box-shadow:0 1px 2px rgba(15,37,55,.05);
-}
-
-/* ---------------------------------------------------------- 搜索 */
-.sbar{display:flex;gap:9px;padding:2px 14px 14px;flex-shrink:0}
-.sinput{
-  flex:1;height:54px;border:1.5px solid #D8DACF;border-radius:17px;
-  padding:0 16px;font-size:var(--fs-19_0);font-family:inherit;outline:none;
-  background:#fff;color:#111;
-}
-.sinput:focus{border-color:#123A5C;box-shadow:0 0 0 3px rgba(18,58,92,.09)}
-.sbtn{
-  width:78px;height:54px;border:none;border-radius:17px;background:#0B2743;color:#fff;
-  font-size:var(--fs-17_0);font-weight:600;font-family:inherit;cursor:pointer;
-}
-
-/* ---------------------------------------------------------- 线路头 */
-.lhead{padding:2px 20px 14px;flex-shrink:0}
-.lh1{display:flex;align-items:center;gap:12px}
-.lh2{font-size:var(--fs-19_0);font-weight:500;color:#5A6068;letter-spacing:-.1px}
-.lh2 b{font-weight:700;color:#0F2537;font-size:var(--fs-21_0)}
-.swap{
-  margin-left:auto;flex-shrink:0;display:inline-flex;align-items:center;gap:5px;
-  border:1px solid #CFD2C6;background:#fff;color:#123A5C;
-  border-radius:999px;padding:9px 15px;
-  font-size:var(--fs-13_5);font-weight:600;font-family:inherit;cursor:pointer;line-height:1;
-}
-.lh3{font-size:var(--fs-12_5);color:#7B7E74;margin-top:7px}
-.noreal{
-  background:#FDF4E3;color:#85571A;border-radius:10px;
-  padding:10px 13px;font-size:var(--fs-13_0);margin-top:10px;line-height:1.5;
-}
-
-/* ---------------------------------------------------------- 时间轴 */
-.tl{
-  position:relative;padding:16px 0 30px;
-  background:#fff;border-radius:24px;margin:0 14px 14px;overflow:hidden;
-  box-shadow:0 1px 2px rgba(15,37,55,.05);
-}
-.stop{display:flex;align-items:center;gap:13px;padding:0 16px;height:58px;position:relative}
-.stop::after{content:"";flex:1 1 0;height:0}
-.stop .rail{position:absolute;left:32.25px;top:0;bottom:0;width:1.5px;background:#E2E4D9}
-.stop:first-child .rail{top:50%}
-.stop:last-child .rail{bottom:50%}
-.dot{
-  position:relative;z-index:1;width:12px;height:12px;border-radius:50%;
-  background:#fff;border:1.5px solid #C9CCBE;flex:0 0 12px;margin-left:11px;
-  box-sizing:border-box;
-}
-.dot.mine{border:none;background:#123A5C;box-shadow:0 0 0 4px rgba(18,58,92,.16)}
-.dot.bus{border:none;background:#E0761C;box-shadow:0 0 0 4px rgba(224,118,28,.17)}
-.sname{
-  font-size:var(--fs-19_0);color:#2E3238;flex:0 1 auto;letter-spacing:-.2px;
-  max-width:64%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.sname.mine{font-weight:700;color:#123A5C}
-.tagme{font-size:var(--fs-11_5);font-weight:700;color:#123A5C;background:#E8EFF6;border-radius:5px;padding:3px 7px}
-.tagbus{font-size:var(--fs-11_5);font-weight:700;color:#fff;background:#E0761C;border-radius:5px;padding:3px 7px}
-.stop.mine{background:#F4F8FC;box-shadow:inset 3px 0 0 #123A5C}
-.stop.busrow{background:#FFF9F1}
-.stop.mine.busrow{background:#F4F8FC}
-.busmeta{font-size:var(--fs-13_0);color:#B0600E;margin-left:8px}
-
-/* ---------------------------------------------------------- 底部按钮 */
-.btnrow{display:flex;gap:9px;padding:10px 14px 18px;flex-shrink:0}
-/* 底部留白躲开全面屏的手势条。先给普通值兜底，再用 max() 覆盖 ——
-   env() 不被支持时整条声明会被丢掉，所以不能只写一条。 */
-.btnrow{padding-bottom:max(18px, env(safe-area-inset-bottom))}
-.btn{
-  flex:1;height:60px;border:none;border-radius:19px;font-size:var(--fs-17_0);
-  font-weight:600;font-family:inherit;cursor:pointer;
-  transition:transform .12s ease, filter .12s ease;
-  -webkit-tap-highlight-color:transparent;
-}
-/* 手机上按下去必须有回应。老人点了没动静会以为没点中，接着连点三下 */
-.btn:active{transform:scale(.975);filter:brightness(.96)}
-.btn.p{background:#0B2743;color:#fff;box-shadow:0 10px 22px -14px rgba(11,39,67,.95)}
-.btn.s{background:#fff;color:#2A3238;border:1px solid #DDDFD2}
-.btn.on{background:#123A5C;color:#fff}
-.tip{font-size:var(--fs-12_0);color:#8E9188;text-align:center;padding:14px 0 4px}
-.loading{padding:64px 20px;text-align:center;font-size:var(--fs-17_0);color:#8A8D83}
-.err{background:#FDF0EE;border:1px solid #EFC2B9;border-radius:16px;padding:20px;margin:16px 4px}
-.err h3{font-size:var(--fs-19_0);color:#A33224;margin-bottom:8px}
-.err p{font-size:var(--fs-15_0);color:#55595E;line-height:1.55}
-"""
-
 V2_OVERRIDE = r"""
 /* ==================================================================
    V2 覆盖层：只写与 V1 的差异，便于逐条对照
@@ -831,8 +568,7 @@ V2_OVERRIDE = r"""
 .btn:focus-visible{outline-offset:3px}
 
 /* ---- 按压反馈：白卡的 .btn 定义在 CSS_A 里，那里没有 :active，
-   必须在这一层补，否则浅色版点了毫无反应（深色版 CSS_B 自带，所以之前
-   只测深色会以为已经生效）。移动端 WebView 单靠 :active 常常不触发，
+   必须在这一层补，否则点了毫无反应。移动端 WebView 单靠 :active 常常不触发，
    真正的按压态由 JS 加 .down 类，这条是给桌面和部分 WebView 兜底。 ---- */
 .btn{transition:transform .12s ease, filter .12s ease, background .12s ease}
 .btn:active,.btn.down{transform:scale(.975);filter:brightness(.94)}
@@ -1181,8 +917,6 @@ body[data-fs="3"] .cmid{margin-top:6px}
 _BASE = CSS_A + V2_OVERRIDE + FS_LAYOUT
 
 SKINS = {
-    "a": CSS_A,
-    "b": CSS_B,
     "c": _BASE,                       # 现有白卡（深蓝）
     "d": _tint(_BASE, _THEME_WARM),   # 暖橘
     # 晴空版：响铃入口单独用暖色点缀，别跟着主色一起变蓝，否则提醒就藏起来了

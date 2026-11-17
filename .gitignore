@@ -5,9 +5,10 @@ __pycache__/
 Thumbs.db
 
 # 安卓构建中间件（源码保留，产物另存在 dist/）
+# build.sh 每次打包用一个新目录：build/、build-11171335/ … 一条通配覆盖
 android/build*/
-android/build-*/
-android/gen/
+# 根目录残留的空 build/（历史遗留，别让它被误加到仓库）
+/build/
 
 # 内部工作数据
 .workbuddy/

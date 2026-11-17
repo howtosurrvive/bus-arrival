@@ -144,29 +144,32 @@ for line in open(os.path.join(out, "certs.txt"), encoding="utf-8", errors="ignor
         cert = line.split("digest:")[1].strip()
         break
 info = {
-    "file": os.path.basename(apk),
     "version": "1.2.4", "versionCode": 7,
     "size": len(data),
     "sha256": hashlib.sha256(data).hexdigest(),
     "cert": cert, "signed": "v1+v2",
     "built": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
 }
-p = os.path.join(os.path.dirname(apk), "apk-info.json")
-open(p, "w", encoding="utf-8").write(json.dumps(info, ensure_ascii=False, indent=2))
-print("==> dist/apk-info.json 已更新")
 
 # 文件名带上哈希：同名文件被替换时，GitHub/CDN 会把旧内容缓存住，
 # 用户会下到旧包，页面上「对不上就别装」就成了空话。名字唯一就不会错配。
+# 注意 apk-info.json 里的 file 必须写**最终那个名字** —— 早先写的是中间名
+# bus-arrival-1.2.4.apk，而这个文件紧接着就被下面的 glob 删掉了，元数据指向空气。
 import glob, shutil
 dist_dir = os.path.dirname(apk)
 sha8 = info["sha256"][:8]
 newname = "bus-arrival-%s-%s.apk" % (info["version"], sha8)
+info["file"] = newname
 target = os.path.join(dist_dir, newname)
 shutil.copyfile(apk, target)          # 先复制，再清理旧的
 for f in glob.glob(os.path.join(dist_dir, "bus-arrival-*.apk")):
     if os.path.abspath(f) != os.path.abspath(target):
         os.remove(f)
 print("==> dist/%s" % newname)
+
+p = os.path.join(dist_dir, "apk-info.json")
+open(p, "w", encoding="utf-8").write(json.dumps(info, ensure_ascii=False, indent=2))
+print("==> dist/apk-info.json 已更新")
 
 # 把下载页上的文件名、校验值、证书指纹同步过来
 idx = os.path.abspath(os.path.join(os.path.dirname(apk), "..", "index.html"))
